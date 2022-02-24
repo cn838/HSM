@@ -18,7 +18,7 @@
 #'
 #' HSM_9_35(data=X9_10_int,group=TRUE,segment = FALSE)
 #'
-HSM_9_35 = function(data,group,segment){
+HSM_9_35 = function(data,group,segment){{
   Nexpected_b = function(P_b,O_b,w) (P_b*w+(1-w)*O_b) #(9A.1-1)
 
   Nexpected_a = function(Nexpected_b,adj) (Nexpected_b*adj) #(9A.1-4)
@@ -43,8 +43,6 @@ HSM_9_35 = function(data,group,segment){
                                                     ifelse(test_statistic < 2 & test_statistic >= 1.7 ,"90%",
                                                            ifelse(test_statistic < Inf & test_statistic>= 2.0, "95%",
                                                                   ifelse(test_statistic==Inf,"Inf",""))))
-}
-
 
   data |>
     dplyr::select(starts_with(c("Site_No.","Yrs","Base","L","C","CMF","Before","After"))) |>
@@ -258,7 +256,7 @@ HSM_9_35 = function(data,group,segment){
         Std.Err.SE=(Std.Err_OR*100),#9A.1-13
 
         test_statistic=abs(SE/Std.Err.SE), #Step 14 (a) & (b)
-        Significance=Significance.test(test_statistic)) %>% dplyr::select(Site_No.:C,CMF,O_b:Significance)|> mutate_if(is.numeric, round, 3) -> df.sites
+        Significance=Significance.test(test_statistic)) %>% dplyr::select(Site_No.:C,CMF,O_b:Significance)|> mutate_if(is.numeric, round, 3) -> data
 
   }
 
@@ -282,7 +280,7 @@ if(group==TRUE){
   test_statistic.grp=function(SE.grp,Std.Err.SE.grp)  abs(sum(SE.grp)/sum(Std.Err.SE.grp))  #Step 14 (a)
 
 
-    df.sites %>%
+    data %>%
       group_by(Base_Past) |>
       dplyr::summarise(No.Sites=n(),#count sites
                        Yrs_Before=sum(Yrs_Before), #edit moved
@@ -331,7 +329,7 @@ if(group==TRUE){
   }
 
 else{
-    df.sites |> rename(
+    data |> rename(
       "Past Base Condition"="Base_Past",
              "Current Base Condition"="Base_Current",
              "Years in the Before Period"="Yrs_Before",

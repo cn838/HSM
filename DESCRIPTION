@@ -5,7 +5,8 @@ Version: 0.1.0
 Author: Christian
 Maintainer: Christian N. MSc.<cn838@aemail.be>
 Description: automaotes calculations. Currently only section 9-35.
-License:GNU GENERAL PUBLIC LICENSE
+License: GNU GENERAL PUBLIC LICENSE
 Encoding: UTF-8
 LazyData: true
 Depends: dplyr, tidyr
+RoxygenNote: 7.1.2
