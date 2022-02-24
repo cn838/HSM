@@ -1,0 +1,11 @@
+Package: HSM
+Type: Package
+Title: Highway Safety Mannual Computations
+Version: 0.1.0
+Author: Christian
+Maintainer: Christian N. MSc.<cn838@aemail.be>
+Description: automaotes calculations. Currently only section 9-35.
+License:GNU GENERAL PUBLIC LICENSE
+Encoding: UTF-8
+LazyData: true
+Depends: dplyr, tidyr
