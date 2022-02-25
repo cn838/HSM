@@ -116,6 +116,7 @@ By using kable() the user can copy and paste table contents into spreadsheet.
 HSM::HSM_9_35(data = data, segment=FALSE, group = FALSE) %>% knitr::kable(digits = 3, format.args = list(decimal.mark = ".", big.mark = ","), align= 'c', caption = "Emperical Bayes Total Crash Pooled Results ")
 ```
 
+
 predicted crashes can be computed using the spf function.
 ```{r}
 spf(
