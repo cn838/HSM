@@ -16,7 +16,7 @@ knitr::opts_chunk$set(
 )
 ```
 
-2010 HSM Section 9-35 Site Specific Empirical Bayes Analysis is included in the Highway Safety Manual (HSM) package.
+2010 HSM Section 9-35 Site Specific Empirical Bayes Analysis is included in the Highway Safety Manual (HSM) package. The vignette provides instructions to use the section 9-35 and spf functions.
 
 ```{r setup}
 #install.packages("devtools")	
@@ -116,5 +116,27 @@ By using kable() the user can copy and paste table contents into spreadsheet.
 HSM::HSM_9_35(data = data, segment=FALSE, group = FALSE) %>% knitr::kable(digits = 3, format.args = list(decimal.mark = ".", big.mark = ","), align= 'c', caption = "Emperical Bayes Total Crash Pooled Results ")
 ```
 
+predicted crashes can be computed using the spf function.
+```{r}
+spf(
+  AADTMAJ=1000,
+  AADTMIN=100,
+  L=NULL,
+  Base_Condition="HSM-RUR2-4ST-KABCO",
+  Provide_Overdispersion_Factor=FALSE,
+  Segment=FALSE
+)
+```
 
+The overdispersion parameter (k) is provided by specifying TRUE within the provide overdispersion factor parameter.
+```{r}
+spf(
+  AADTMAJ=1000,
+  AADTMIN=100,
+  L=NULL,
+  Base_Condition="HSM-RUR2-4ST-KABCO",
+  Provide_Overdispersion_Factor=TRUE,
+  Segment=FALSE
+)
+```
 
