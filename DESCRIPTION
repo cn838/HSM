@@ -10,3 +10,7 @@ Encoding: UTF-8
 LazyData: true
 Depends: dplyr, tidyr
 RoxygenNote: 7.1.2
+Suggests: 
+    rmarkdown,
+    knitr
+VignetteBuilder: knitr

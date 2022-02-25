@@ -1,0 +1,120 @@
+---
+title: "HSM_9_35"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{HSM_9_35}
+  %\VignetteEncoding{UTF-8}
+  %\VignetteEngine{knitr::rmarkdown}
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+2010 HSM Section 9-35 Site Specific Empirical Bayes Analysis is included in the Highway Safety Manual (HSM) package.
+
+```{r setup}
+#install.packages("devtools")	
+library(devtools)
+```
+
+Install package via GitHub.
+```{r}
+#install_github("https://github.com/cn838/HSM.git")
+library(HSM)
+
+```
+
+Enter Data. This is performed by using concatenate c() and data.frame().  Please note that column titles must be the same titles.
+```{r}
+
+data=data.frame(
+Site_No.=c(1,2,3,4,5,6), # id number 
+Yrs_Before=c(3,3,3,3,3,3), # years in the before period
+Yrs_After=c(3,3,3,3,3,3), # years in the after period
+Base_Past=c(
+  "HSM-RUR2-3ST-KABCO",	#SPF associated with the intersection or treatment for KABCO or KABC crash types.
+  "HSM-RUR2-4ST-KABCO", 
+  "HSM-RUR2-4SG-KABCO",
+  "HSM-RUR2-3ST-KABCO",	
+  "HSM-RUR2-4ST-KABCO",
+  "HSM-RUR2-4SG-KABCO"
+),
+Base_Current=c(
+  "Roundabout",
+  "Roundabout",
+  "Roundabout",
+  "Roundabout",
+  "Roundabout",
+  "Roundabout"),
+L=c(NA,NA,NA,NA,NA,NA), # not required for intersection analysis
+CMF=c(1.1,0.90,0.98,1,1,1.0), #crash modification factor. User specifies 1.0 if none was used.
+C=c(1.2,1.2,1.2,1.2,1.2,1.2), #calibration factor. User specifies 1.0 if none was used.
+Before.AADT.Major_1=c(1100,1190,1100,1150,900,500), #traffic volumes on the major approach during year one for site one ect.
+Before.AADT.Major_2=c(1000,900,1150,1150,900,550),
+Before.AADT.Major_3=c(1000,950,1125,1150,900,550),
+Before.AADT.Major_4=c(1000,950,1125,1150,900,550),
+Before.AADT.Major_5=c(1050,900,1125,1150,900,550),
+Before.AADT.Major_6=c(1050,900,1125,1150,900,550),
+
+Before.AADT.Minor_1=c(100,90,1100,110,90,550), #traffic volumes for minor approaches
+Before.AADT.Minor_2=c(100,90,1100,110,90,550),
+Before.AADT.Minor_3=c(100,90,1100,110,90,550),
+Before.AADT.Minor_4=c(100,90,1100,110,90,550),
+Before.AADT.Minor_5=c(100,90,1100,110,90,550),
+Before.AADT.Minor_6=c(100,90,1100,110,90,550),
+
+After.AADT.Major_1=c(1000,1000,1000,1000,1000,1000), #major approach traffic volumes in the after period 
+After.AADT.Major_2=c(1000,1000,1000,1000,1000,1000),
+After.AADT.Major_3=c(1000,1000,1000,1000,1000,1000),
+After.AADT.Major_4=c(1000,1000,1000,1000,1000,1000),
+After.AADT.Major_5=c(1000,1000,1000,1000,1000,1000),
+After.AADT.Major_6=c(1000,1000,1000,1000,1000,1000),
+
+After.AADT.Minor_1=c(200,200,80,700,80,90),#minor approach traffic volumes in the after period 
+After.AADT.Minor_2=c(200,200,80,700,80,90),
+After.AADT.Minor_3=c(200,200,80,700,80,90),
+After.AADT.Minor_4=c(200,200,80,700,80,90),
+After.AADT.Minor_5=c(200,200,80,700,80,90),
+After.AADT.Minor_6=c(200,200,80,700,80,90),
+
+Before.Yr_1=c(0,2,3,1,1,3), # crashes in the before period
+Before.Yr_2=c(0,0,0,0,0,0),
+Before.Yr_3=c(1,0,1,3,0,0),
+Before.Yr_4=c(0,1,0,1,0,1),
+Before.Yr_5=c(1,0,0,1,0,1),
+Before.Yr_6=c(0,0,0,1,1,0),
+
+After.Yr_1=c(0,0,0,0,0,1), # crashes in the after period
+After.Yr_2=c(0,0,0,0,0,0),
+After.Yr_3=c(0,0,1,0,0,1),
+After.Yr_4=c(0,1,0,0,0,0),
+After.Yr_5=c(0,0,0,0,0,0),
+After.Yr_6=c(1,0,0,1,0,0))
+
+```
+
+Specify the group equal to "FALSE" to provide summary table for site specific results. 
+```{r}
+HSM::HSM_9_35(data = data, segment=FALSE, group = FALSE)
+```
+
+Specify the group equal to "TRUE" to provide summary table for pooled results. The unbiased Odds Ratio provides the CMF. Similar to the comparison group method, this approach is vulnerable to having zero in the after periods.
+```{r}
+HSM::HSM_9_35(data = data, segment=FALSE, group = TRUE)
+```
+
+By using kable() the user can copy and paste table contents into spreadsheet.
+
+```{r}
+
+HSM::HSM_9_35(data = data, segment=FALSE, group = FALSE) %>% knitr::kable(digits = 3, format.args = list(decimal.mark = ".", big.mark = ","), align= 'c', caption = "Emperical Bayes Total Crash Pooled Results ")
+```
+
+
+
