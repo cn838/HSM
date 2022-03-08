@@ -18,7 +18,1175 @@
 #'
 #' HSM_9_35(data=X9_10_int,group=TRUE,segment = FALSE)
 #'
-HSM_9_35 = function(data,group,segment){{
+HSM_9_35 = function(data,group,segment, group_base_by="Past"){
+
+if(group==TRUE & segment==TRUE & group_base_by=="Past"){
+
+    Nexpected_b = function(P_b,O_b,w) (P_b*w+(1-w)*O_b) #(9A.1-1)
+
+    Nexpected_a = function(Nexpected_b,adj) (Nexpected_b*adj) #(9A.1-4)
+
+    OR.i = function(O_a,Nexp_a) (O_a)/(Nexp_a) #(9A.1-5) # Lines 72-82 Edit: Removed sum function from denominator and numerator 1/24
+
+    VAR.=function(adj,Nexp_b,w) (adj^(2)*Nexp_b*(1-w)) #(9A.1-9)
+
+    OR.=function(OR.i,VAR.,Nexp_a) (OR.i)/(1+VAR.)/Nexp_a^2 #(9A.1-8)
+
+    SE.=function(OR.) (100*(1-OR.)) # (9A.1-10)
+
+    VarOR.=function(OR.i,O_a,VAR.,Nexp_a) (OR.i)^(2)*(1/(O_a)+(VAR.)/(Nexp_a)^(2)/(1+(VAR.)/(Nexp_a)^2)) #(9A.1-11)
+
+    Std.Err.OR.=function(VarOR.) ((VarOR.)^(1/2)) #(9A.1-12)
+
+    Std.Err.SE.=function(Std.Err.OR.) (100*Std.Err.OR.) #(9A.1-13)
+
+    test_statistic.=function(SE.,Std.Err.SE.)  (abs(SE./Std.Err.SE.)) #Step 14 (a)
+
+    Significance.test=function(test_statistic) ifelse(test_statistic <1.7, "N.S.",
+                                                      ifelse(test_statistic < 2 & test_statistic >= 1.7 ,"90%",
+                                                             ifelse(test_statistic < Inf & test_statistic>= 2.0, "95%",
+                                                                    ifelse(test_statistic==Inf,"Inf",""))))
+    #add if statement for segment=TRUE. This will remove the requirement for ambiguities between intersection and segment treatment types (i.e. minor volume and segment lengths).
+    data |>
+      dplyr::select(starts_with(c("Site_No.","Yrs","Base","L","C","CMF","Before","After"))) |>
+      pivot_longer(cols = -c(Site_No.:C,CMF,Yrs_Before,Yrs_After), names_to = c(".value", "Year"), names_sep = "_", values_drop_na = TRUE) |> #fill(L, .direction = "downup") |> # suggested edit 1
+      drop_na(Year)|> rowwise() |>
+      dplyr::mutate(
+        P.T.B= if(segment==TRUE) {C*CMF*spf(AADTMAJ=Before.AADT.Major,AADTMIN=NULL,L=L,Base_Condition=Base_Past,Provide_Overdispersion_Factor=FALSE,Segment=TRUE)} else
+        {C*CMF*spf(AADTMAJ=Before.AADT.Major,AADTMIN=Before.AADT.Minor,L=NULL,Base_Condition=Base_Past,Provide_Overdispersion_Factor=FALSE,Segment=FALSE)},
+        P.T.A= if(segment==TRUE) {
+          C*CMF*spf(AADTMAJ=After.AADT.Major,AADTMIN=NULL,L=L,Base_Condition=Base_Past,Provide_Overdispersion_Factor=FALSE,Segment=TRUE)} else
+          {C*CMF*spf(AADTMAJ=After.AADT.Major,AADTMIN=After.AADT.Minor,L=NULL,Base_Condition=Base_Past,Provide_Overdispersion_Factor=FALSE,Segment=FALSE)})|> select(-matches("Minor")) %>%
+      pivot_wider(
+        names_from = Year,
+        names_sep = "_",
+        values_from = c(Before.AADT.Major,After.AADT.Major, Before.Yr,After.Yr, P.T.B,P.T.A ))%>% rowwise() |> dplyr::mutate( # Begin Table Layout and Empirical Bayes Testing Procedure
+
+          O_b=ifelse(
+            Yrs_Before == 1, rowSums(across(Before.Yr_1)),
+            ifelse(
+              Yrs_Before == 2, rowSums(across(Before.Yr_1:Before.Yr_2)),
+              ifelse(
+                Yrs_Before == 3, rowSums(across(Before.Yr_1:Before.Yr_3)),
+                ifelse(
+                  Yrs_Before == 4, rowSums(across(Before.Yr_1:Before.Yr_4)),
+                  ifelse(
+                    Yrs_Before == 5, rowSums(across(Before.Yr_1:Before.Yr_5)),
+                    ifelse(
+                      Yrs_Before == 6, rowSums(across(Before.Yr_1:Before.Yr_6)),
+                      ifelse(
+                        Yrs_Before == 7, rowSums(across(Before.Yr_1:Before.Yr_7)),
+                        ifelse(
+                          Yrs_Before == 8, rowSums(across(Before.Yr_1:Before.Yr_8)),
+                          ifelse(
+                            Yrs_Before == 9 ~ rowSums(across(Before.Yr_1:Before.Yr_9)),
+                            ifelse(
+                              Yrs_Before == 10 ~ rowSums(across(Before.Yr_1:Before.Yr_10),""))))))))))),
+
+          Avg_AADTmaj_b=ifelse(
+            Yrs_Before == 1, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_1)),
+            ifelse(
+              Yrs_Before == 2, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_2)),
+              ifelse(
+                Yrs_Before == 3, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_3)),
+                ifelse(
+                  Yrs_Before == 4, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_4)),
+                  ifelse(
+                    Yrs_Before == 5, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_5)),
+                    ifelse(
+                      Yrs_Before == 6, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_6)),
+                      ifelse(
+                        Yrs_Before == 7, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_7)),
+                        ifelse(
+                          Yrs_Before == 8, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_8)),
+                          ifelse(
+                            Yrs_Before == 9 ~ rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_9)),
+                            ifelse(
+                              Yrs_Before == 10 ~ rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_10),""))))))))))),
+
+
+
+          P_b=ifelse(
+            Yrs_Before == 1, rowSums(across(P.T.B_1:P.T.B_1)),
+            ifelse(
+              Yrs_Before == 2, rowSums(across(P.T.B_1:P.T.B_2)),
+              ifelse(
+                Yrs_Before == 3, rowSums(across(P.T.B_1:P.T.B_3)),
+                ifelse(
+                  Yrs_Before == 4, rowSums(across(P.T.B_1:P.T.B_4)),
+                  ifelse(
+                    Yrs_Before == 5, rowSums(across(P.T.B_1:P.T.B_5)),
+                    ifelse(
+                      Yrs_Before == 6, rowSums(across(P.T.B_1:P.T.B_6)),
+                      ifelse(
+                        Yrs_Before == 7, rowSums(across(P.T.B_1:P.T.B_7)),
+                        ifelse(
+                          Yrs_Before == 8, rowSums(across(P.T.B_1:P.T.B_8)),
+                          ifelse(
+                            Yrs_Before == 9 ~ rowSums(across(P.T.B_1:P.T.B_9)),
+                            ifelse(
+                              Yrs_Before == 10 ~ rowSums(across(P.T.B_1:P.T.B_10),""))))))))))),
+
+
+          Avg_AADTmaj_a=ifelse(
+            Yrs_After == 1, rowMeans(across(After.AADT.Major_1:After.AADT.Major_1)),
+            ifelse(
+              Yrs_After == 2, rowMeans(across(After.AADT.Major_1:After.AADT.Major_2)),
+              ifelse(
+                Yrs_After == 3, rowMeans(across(After.AADT.Major_1:After.AADT.Major_3)),
+                ifelse(
+                  Yrs_After == 4, rowMeans(across(After.AADT.Major_1:After.AADT.Major_4)),
+                  ifelse(
+                    Yrs_After == 5, rowMeans(across(After.AADT.Major_1:After.AADT.Major_5)),
+                    ifelse(
+                      Yrs_After == 6, rowMeans(across(After.AADT.Major_1:After.AADT.Major_6)),
+                      ifelse(
+                        Yrs_After == 7, rowMeans(across(After.AADT.Major_1:After.AADT.Major_7)),
+                        ifelse(
+                          Yrs_After == 8, rowMeans(across(After.AADT.Major_1:After.AADT.Major_8)),
+                          ifelse(
+                            Yrs_After == 9 ~ rowMeans(across(After.AADT.Major_1:After.AADT.Major_9)),
+                            ifelse(
+                              Yrs_After == 10 ~ rowMeans(across(After.AADT.Major_1:After.AADT.Major_10)),"")))))))))),
+
+          P_a=ifelse(
+            Yrs_After == 1, rowSums(across(P.T.A_1:P.T.A_1)),
+            ifelse(
+              Yrs_After == 2, rowSums(across(P.T.A_1:P.T.A_2)),
+              ifelse(
+                Yrs_After == 3, rowSums(across(P.T.A_1:P.T.A_3)),
+                ifelse(
+                  Yrs_After == 4, rowSums(across(P.T.A_1:P.T.A_4)),
+                  ifelse(
+                    Yrs_After == 5, rowSums(across(P.T.A_1:P.T.A_5)),
+                    ifelse(
+                      Yrs_After == 6, rowSums(across(P.T.A_1:P.T.A_6)),
+                      ifelse(
+                        Yrs_After == 7, rowSums(across(P.T.A_1:P.T.A_7)),
+                        ifelse(
+                          Yrs_After == 8, rowSums(across(P.T.A_1:P.T.A_8)),
+                          ifelse(
+                            Yrs_After == 9 ~ rowSums(across(P.T.A_1:P.T.A_9)),
+                            ifelse(
+                              Yrs_After == 10 ~ rowSums(across(P.T.A_1:P.T.A_10),""))))))))))),
+
+          k=if(segment==TRUE) {
+            spf(L=L,Base_Condition=Base_Past,Provide_Overdispersion_Factor=TRUE,Segment=TRUE)} else
+            {
+              spf(AADTMAJ=NULL,AADTMIN=NULL,L=NULL,Base_Condition=Base_Past,Provide_Overdispersion_Factor=TRUE,Segment=FALSE)},
+
+          w=(1/(1+k*P_b)), # (9A.1-2)
+
+          adj=(P_a/P_b),  # (9A.1-3)
+
+          Nexp_b= Nexpected_b(P_b,O_b,w), # Nexp,b=Predicted*w+(1-w)O_bs,b; HSM (9A.1-4) #bayes estimates
+
+          Nexp_a=Nexpected_a(Nexp_b,adj), # (9A.1-4)
+
+          O_a=ifelse(
+            Yrs_After == 1, rowSums(across(After.Yr_1)),
+            ifelse(
+              Yrs_After == 2, rowSums(across(After.Yr_1:After.Yr_2)),
+              ifelse(
+                Yrs_After == 3, rowSums(across(After.Yr_1:After.Yr_3)),
+                ifelse(
+                  Yrs_After == 4, rowSums(across(After.Yr_1:After.Yr_4)),
+                  ifelse(
+                    Yrs_After == 5, rowSums(across(After.Yr_1:After.Yr_5)),
+                    ifelse(
+                      Yrs_After == 6, rowSums(across(After.Yr_1:After.Yr_6)),
+                      ifelse(
+                        Yrs_After == 7, rowSums(across(After.Yr_1:After.Yr_7)),
+                        ifelse(
+                          Yrs_After == 8, rowSums(across(After.Yr_1:After.Yr_8)),
+                          ifelse(
+                            Yrs_After == 9 ~ rowSums(across(After.Yr_1:After.Yr_9)),
+                            ifelse(
+                              Yrs_After == 10 ~ rowSums(across(After.Yr_1:After.Yr_10),""))))))))))),
+
+          ORi= OR.i(O_a,Nexp_a),#Observed,a/Expected,a; HSM (9A.1-5)
+
+          Var.=VAR.(adj,Nexp_b,w),#(9A.1-9)
+
+          OR=OR.(ORi,Var.,Nexp_a), #(9A.1-8)
+
+          SE=SE.(ORi), #correction from OR to ORi
+
+          VarOR=VarOR.(ORi,O_a,Var.,Nexp_a),#9A.1-11
+
+          Std.Err_OR=Std.Err.OR.(VarOR),#9A.1-12
+
+          Std.Err.SE=(Std.Err_OR*100),#9A.1-13
+
+          test_statistic=abs(SE/Std.Err.SE), #Step 14 (a) & (b)
+          Significance=Significance.test(test_statistic)) %>% dplyr::select(Site_No.:C,CMF,O_b:Significance)|> mutate_if(is.numeric, round, 3) -> data
+
+
+
+    #pooling or grouping functions (grp)
+    OR.grp.i = function(O_a,Nexp_a) sum(O_a)/sum(Nexp_a) #(9A.1-7)
+
+    VAR.grp=function(adj,Nexp_b,w) sum(adj^(2)*Nexp_b*(1-w)) #(9A.1-9) #edited. summation over entire function
+
+    OR.grp=function(OR.grp.i,VAR.grp,Nexp_a) sum(OR.grp.i)/(1+sum(VAR.grp)/sum(Nexp_a)^2) # (9A.1-8) #edited switched sum(Nexp_a^2) to sum(Nexp_a)^2
+
+    SE.grp=function(OR.grp) 100*(1-sum(OR.grp)) #(9A.1-10)
+
+    VarOR.grp=function(OR.grp.i,O_a,VAR.grp,Nexp_a) sum(OR.grp.i)^(2)*(1/sum(O_a)+sum(VAR.grp)/sum(Nexp_a)^(2)/(1+sum(VAR.grp)/sum(Nexp_a)^2)) #(9A.1-11)
+
+    Std.Err.OR.grp=function(VarOR.grp) sum(VarOR.grp)^(1/2) #(9A.1-12)
+
+    Std.Err.SE.grp=function(Std.Err.OR.grp) 100*sum(Std.Err.OR.grp) #(9A.1-13)
+
+    test_statistic.grp=function(SE.grp,Std.Err.SE.grp)  abs(sum(SE.grp)/sum(Std.Err.SE.grp))  #Step 14 (a)
+
+
+    data %>%
+      group_by(Base_Past) |>
+      dplyr::summarise(No.Sites=n(),#count sites
+                       Yrs_Before=sum(Yrs_Before), #edit moved
+                       Yrs_After=sum(Yrs_After), #edit moved
+                       O_b.grp.=sum(O_b),
+                       O_a.grp.=sum(O_a),
+                       P_b=sum(P_b),
+                       Nexp_b.grp.=sum(Nexp_b), #(9A.1-1)
+                       P_a=sum(P_a), #(9A.1-1)
+                       Nexp_a.grp.=sum(Nexp_a), #(9A.1-4)
+                       Avg_AADTmaj_b=mean(Avg_AADTmaj_b),
+                       Avg_AADTmaj_a=mean(Avg_AADTmaj_a),
+                       OR.grp.i.=OR.grp.i(O_a,Nexp_a), #(9A.1-7)
+                       VAR.grp.=VAR.grp(adj,Nexp_b,w), #(9A.1-9)
+                       OR.grp.=OR.grp(OR.grp.i.,VAR.grp.,Nexp_a), #(9A.1-8)
+                       VarOR.grp.=VarOR.grp(OR.grp.i.,O_a,VAR.grp.,Nexp_a), #(9A.1-11)
+                       SE.grp.=SE.grp(OR.grp.), #(9A.1-10)
+                       Std.Err.OR.grp.=Std.Err.OR.grp(VarOR.grp.), #(9A.1-12)
+                       Std.Err.SE.grp.=Std.Err.SE.grp(Std.Err.OR.grp.), #(9A.1-13)
+                       test_statistic.grp.=test_statistic.grp(SE.grp.,Std.Err.SE.grp.), #Step 14 (a)
+                       Significance.test.grp.=Significance.test(test_statistic.grp.)) |>
+      mutate_if(is.numeric, round, 3) |>
+      rename(
+        "Total Sites"="No.Sites",
+        "Past Base Condition"="Base_Past",
+        "Years in the Before Period"="Yrs_Before",
+        "Average AADT in the Before Period"="Avg_AADTmaj_b",
+        "Total Predicted Crashes in the Before Period"="P_b",
+        "Total Observed Crashes in the Before Periods"="O_b.grp.",
+        "Expected Crashes in the Before Period (9A.1-2)"="Nexp_b.grp.",
+        "Average AADT in the After Period"="Avg_AADTmaj_a",
+        "Total Predicted Crashes in the After Period"="P_a",
+        "Total Years in the After Period"="Yrs_After",
+        "Total Expected Crashes in the After Period (9A.1-4)"="Nexp_a.grp.",
+        "Total Observed Crashes in the After Period"="O_a.grp.",
+        "Odds Ratio (9A.1-5)"="OR.grp.i.",
+        "Variance (9A.1-11)"="VAR.grp.",
+        "Unbiased Odds Ratio (9A.1-8)"="OR.grp.",
+        "Variance Odds Ratio"="VarOR.grp.",
+        "Standard Error Odds Ratio (9A.1-12)"="Std.Err.OR.grp.",
+        "Safety Effectiveness (9A.1-10)"="SE.grp.",
+        "Standard Error of Safety Effectiveness (9A.1-13)"="Std.Err.SE.grp.",
+        "Test Statistic (Step 14)"="test_statistic.grp.",
+        "Significance Level (Step 14)"="Significance.test.grp.")
+
+  } #verified
+
+  else if (group==TRUE & segment==TRUE & group_base_by=="Current"){
+
+    Nexpected_b = function(P_b,O_b,w) (P_b*w+(1-w)*O_b) #(9A.1-1)
+
+    Nexpected_a = function(Nexpected_b,adj) (Nexpected_b*adj) #(9A.1-4)
+
+    OR.i = function(O_a,Nexp_a) (O_a)/(Nexp_a) #(9A.1-5) # Lines 72-82 Edit: Removed sum function from denominator and numerator 1/24
+
+    VAR.=function(adj,Nexp_b,w) (adj^(2)*Nexp_b*(1-w)) #(9A.1-9)
+
+    OR.=function(OR.i,VAR.,Nexp_a) (OR.i)/(1+VAR.)/Nexp_a^2 #(9A.1-8)
+
+    SE.=function(OR.) (100*(1-OR.)) # (9A.1-10)
+
+    VarOR.=function(OR.i,O_a,VAR.,Nexp_a) (OR.i)^(2)*(1/(O_a)+(VAR.)/(Nexp_a)^(2)/(1+(VAR.)/(Nexp_a)^2)) #(9A.1-11)
+
+    Std.Err.OR.=function(VarOR.) ((VarOR.)^(1/2)) #(9A.1-12)
+
+    Std.Err.SE.=function(Std.Err.OR.) (100*Std.Err.OR.) #(9A.1-13)
+
+    test_statistic.=function(SE.,Std.Err.SE.)  (abs(SE./Std.Err.SE.)) #Step 14 (a)
+
+    Significance.test=function(test_statistic) ifelse(test_statistic <1.7, "N.S.",
+                                                      ifelse(test_statistic < 2 & test_statistic >= 1.7 ,"90%",
+                                                             ifelse(test_statistic < Inf & test_statistic>= 2.0, "95%",
+                                                                    ifelse(test_statistic==Inf,"Inf",""))))
+    #add if statement for segment=TRUE. This will remove the requirement for ambiguities between intersection and segment treatment types (i.e. minor volume and segment lengths).
+    data |>
+      dplyr::select(starts_with(c("Site_No.","Yrs","Base","L","C","CMF","Before","After"))) |>
+      pivot_longer(cols = -c(Site_No.:C,CMF,Yrs_Before,Yrs_After), names_to = c(".value", "Year"), names_sep = "_", values_drop_na = TRUE) |> #fill(L, .direction = "downup") |> # suggested edit 1
+      drop_na(Year)|> rowwise() |>
+      dplyr::mutate(
+        P.T.B= if(segment==TRUE) {C*CMF*spf(AADTMAJ=Before.AADT.Major,AADTMIN=NULL,L=L,Base_Condition=Base_Past,Provide_Overdispersion_Factor=FALSE,Segment=TRUE)} else
+        {C*CMF*spf(AADTMAJ=Before.AADT.Major,AADTMIN=Before.AADT.Minor,L=NULL,Base_Condition=Base_Past,Provide_Overdispersion_Factor=FALSE,Segment=FALSE)},
+        P.T.A= if(segment==TRUE) {
+          C*CMF*spf(AADTMAJ=After.AADT.Major,AADTMIN=NULL,L=L,Base_Condition=Base_Past,Provide_Overdispersion_Factor=FALSE,Segment=TRUE)} else
+          {C*CMF*spf(AADTMAJ=After.AADT.Major,AADTMIN=After.AADT.Minor,L=NULL,Base_Condition=Base_Past,Provide_Overdispersion_Factor=FALSE,Segment=FALSE)})|> select(-matches("Minor")) %>%
+      pivot_wider(
+        names_from = Year,
+        names_sep = "_",
+        values_from = c(Before.AADT.Major,After.AADT.Major, Before.Yr,After.Yr, P.T.B,P.T.A ))%>% rowwise() |> dplyr::mutate( # Begin Table Layout and Empirical Bayes Testing Procedure
+
+          O_b=ifelse(
+            Yrs_Before == 1, rowSums(across(Before.Yr_1)),
+            ifelse(
+              Yrs_Before == 2, rowSums(across(Before.Yr_1:Before.Yr_2)),
+              ifelse(
+                Yrs_Before == 3, rowSums(across(Before.Yr_1:Before.Yr_3)),
+                ifelse(
+                  Yrs_Before == 4, rowSums(across(Before.Yr_1:Before.Yr_4)),
+                  ifelse(
+                    Yrs_Before == 5, rowSums(across(Before.Yr_1:Before.Yr_5)),
+                    ifelse(
+                      Yrs_Before == 6, rowSums(across(Before.Yr_1:Before.Yr_6)),
+                      ifelse(
+                        Yrs_Before == 7, rowSums(across(Before.Yr_1:Before.Yr_7)),
+                        ifelse(
+                          Yrs_Before == 8, rowSums(across(Before.Yr_1:Before.Yr_8)),
+                          ifelse(
+                            Yrs_Before == 9 ~ rowSums(across(Before.Yr_1:Before.Yr_9)),
+                            ifelse(
+                              Yrs_Before == 10 ~ rowSums(across(Before.Yr_1:Before.Yr_10),""))))))))))),
+
+          Avg_AADTmaj_b=ifelse(
+            Yrs_Before == 1, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_1)),
+            ifelse(
+              Yrs_Before == 2, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_2)),
+              ifelse(
+                Yrs_Before == 3, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_3)),
+                ifelse(
+                  Yrs_Before == 4, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_4)),
+                  ifelse(
+                    Yrs_Before == 5, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_5)),
+                    ifelse(
+                      Yrs_Before == 6, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_6)),
+                      ifelse(
+                        Yrs_Before == 7, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_7)),
+                        ifelse(
+                          Yrs_Before == 8, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_8)),
+                          ifelse(
+                            Yrs_Before == 9 ~ rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_9)),
+                            ifelse(
+                              Yrs_Before == 10 ~ rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_10),""))))))))))),
+
+
+
+          P_b=ifelse(
+            Yrs_Before == 1, rowSums(across(P.T.B_1:P.T.B_1)),
+            ifelse(
+              Yrs_Before == 2, rowSums(across(P.T.B_1:P.T.B_2)),
+              ifelse(
+                Yrs_Before == 3, rowSums(across(P.T.B_1:P.T.B_3)),
+                ifelse(
+                  Yrs_Before == 4, rowSums(across(P.T.B_1:P.T.B_4)),
+                  ifelse(
+                    Yrs_Before == 5, rowSums(across(P.T.B_1:P.T.B_5)),
+                    ifelse(
+                      Yrs_Before == 6, rowSums(across(P.T.B_1:P.T.B_6)),
+                      ifelse(
+                        Yrs_Before == 7, rowSums(across(P.T.B_1:P.T.B_7)),
+                        ifelse(
+                          Yrs_Before == 8, rowSums(across(P.T.B_1:P.T.B_8)),
+                          ifelse(
+                            Yrs_Before == 9 ~ rowSums(across(P.T.B_1:P.T.B_9)),
+                            ifelse(
+                              Yrs_Before == 10 ~ rowSums(across(P.T.B_1:P.T.B_10),""))))))))))),
+
+
+          Avg_AADTmaj_a=ifelse(
+            Yrs_After == 1, rowMeans(across(After.AADT.Major_1:After.AADT.Major_1)),
+            ifelse(
+              Yrs_After == 2, rowMeans(across(After.AADT.Major_1:After.AADT.Major_2)),
+              ifelse(
+                Yrs_After == 3, rowMeans(across(After.AADT.Major_1:After.AADT.Major_3)),
+                ifelse(
+                  Yrs_After == 4, rowMeans(across(After.AADT.Major_1:After.AADT.Major_4)),
+                  ifelse(
+                    Yrs_After == 5, rowMeans(across(After.AADT.Major_1:After.AADT.Major_5)),
+                    ifelse(
+                      Yrs_After == 6, rowMeans(across(After.AADT.Major_1:After.AADT.Major_6)),
+                      ifelse(
+                        Yrs_After == 7, rowMeans(across(After.AADT.Major_1:After.AADT.Major_7)),
+                        ifelse(
+                          Yrs_After == 8, rowMeans(across(After.AADT.Major_1:After.AADT.Major_8)),
+                          ifelse(
+                            Yrs_After == 9 ~ rowMeans(across(After.AADT.Major_1:After.AADT.Major_9)),
+                            ifelse(
+                              Yrs_After == 10 ~ rowMeans(across(After.AADT.Major_1:After.AADT.Major_10)),"")))))))))),
+
+          P_a=ifelse(
+            Yrs_After == 1, rowSums(across(P.T.A_1:P.T.A_1)),
+            ifelse(
+              Yrs_After == 2, rowSums(across(P.T.A_1:P.T.A_2)),
+              ifelse(
+                Yrs_After == 3, rowSums(across(P.T.A_1:P.T.A_3)),
+                ifelse(
+                  Yrs_After == 4, rowSums(across(P.T.A_1:P.T.A_4)),
+                  ifelse(
+                    Yrs_After == 5, rowSums(across(P.T.A_1:P.T.A_5)),
+                    ifelse(
+                      Yrs_After == 6, rowSums(across(P.T.A_1:P.T.A_6)),
+                      ifelse(
+                        Yrs_After == 7, rowSums(across(P.T.A_1:P.T.A_7)),
+                        ifelse(
+                          Yrs_After == 8, rowSums(across(P.T.A_1:P.T.A_8)),
+                          ifelse(
+                            Yrs_After == 9 ~ rowSums(across(P.T.A_1:P.T.A_9)),
+                            ifelse(
+                              Yrs_After == 10 ~ rowSums(across(P.T.A_1:P.T.A_10),""))))))))))),
+
+          k=if(segment==TRUE) {
+            spf(L=L,Base_Condition=Base_Past,Provide_Overdispersion_Factor=TRUE,Segment=TRUE)} else
+            {
+              spf(AADTMAJ=NULL,AADTMIN=NULL,L=NULL,Base_Condition=Base_Past,Provide_Overdispersion_Factor=TRUE,Segment=FALSE)},
+
+          w=(1/(1+k*P_b)), # (9A.1-2)
+
+          adj=(P_a/P_b),  # (9A.1-3)
+
+          Nexp_b= Nexpected_b(P_b,O_b,w), # Nexp,b=Predicted*w+(1-w)O_bs,b; HSM (9A.1-4) #bayes estimates
+
+          Nexp_a=Nexpected_a(Nexp_b,adj), # (9A.1-4)
+
+          O_a=ifelse(
+            Yrs_After == 1, rowSums(across(After.Yr_1)),
+            ifelse(
+              Yrs_After == 2, rowSums(across(After.Yr_1:After.Yr_2)),
+              ifelse(
+                Yrs_After == 3, rowSums(across(After.Yr_1:After.Yr_3)),
+                ifelse(
+                  Yrs_After == 4, rowSums(across(After.Yr_1:After.Yr_4)),
+                  ifelse(
+                    Yrs_After == 5, rowSums(across(After.Yr_1:After.Yr_5)),
+                    ifelse(
+                      Yrs_After == 6, rowSums(across(After.Yr_1:After.Yr_6)),
+                      ifelse(
+                        Yrs_After == 7, rowSums(across(After.Yr_1:After.Yr_7)),
+                        ifelse(
+                          Yrs_After == 8, rowSums(across(After.Yr_1:After.Yr_8)),
+                          ifelse(
+                            Yrs_After == 9 ~ rowSums(across(After.Yr_1:After.Yr_9)),
+                            ifelse(
+                              Yrs_After == 10 ~ rowSums(across(After.Yr_1:After.Yr_10),""))))))))))),
+
+          ORi= OR.i(O_a,Nexp_a),#Observed,a/Expected,a; HSM (9A.1-5)
+
+          Var.=VAR.(adj,Nexp_b,w),#(9A.1-9)
+
+          OR=OR.(ORi,Var.,Nexp_a), #(9A.1-8)
+
+          SE=SE.(ORi), #correction from OR to ORi
+
+          VarOR=VarOR.(ORi,O_a,Var.,Nexp_a),#9A.1-11
+
+          Std.Err_OR=Std.Err.OR.(VarOR),#9A.1-12
+
+          Std.Err.SE=(Std.Err_OR*100),#9A.1-13
+
+          test_statistic=abs(SE/Std.Err.SE), #Step 14 (a) & (b)
+          Significance=Significance.test(test_statistic)) %>% dplyr::select(Site_No.:C,CMF,O_b:Significance)|> mutate_if(is.numeric, round, 3) -> data
+
+
+
+    #pooling or grouping functions (grp)
+    OR.grp.i = function(O_a,Nexp_a) sum(O_a)/sum(Nexp_a) #(9A.1-7)
+
+    VAR.grp=function(adj,Nexp_b,w) sum(adj^(2)*Nexp_b*(1-w)) #(9A.1-9) #edited. summation over entire function
+
+    OR.grp=function(OR.grp.i,VAR.grp,Nexp_a) sum(OR.grp.i)/(1+sum(VAR.grp)/sum(Nexp_a)^2) # (9A.1-8) #edited switched sum(Nexp_a^2) to sum(Nexp_a)^2
+
+    SE.grp=function(OR.grp) 100*(1-sum(OR.grp)) #(9A.1-10)
+
+    VarOR.grp=function(OR.grp.i,O_a,VAR.grp,Nexp_a) sum(OR.grp.i)^(2)*(1/sum(O_a)+sum(VAR.grp)/sum(Nexp_a)^(2)/(1+sum(VAR.grp)/sum(Nexp_a)^2)) #(9A.1-11)
+
+    Std.Err.OR.grp=function(VarOR.grp) sum(VarOR.grp)^(1/2) #(9A.1-12)
+
+    Std.Err.SE.grp=function(Std.Err.OR.grp) 100*sum(Std.Err.OR.grp) #(9A.1-13)
+
+    test_statistic.grp=function(SE.grp,Std.Err.SE.grp)  abs(sum(SE.grp)/sum(Std.Err.SE.grp))  #Step 14 (a)
+
+
+    data %>%
+      group_by(Base_Current) |>
+      dplyr::summarise(No.Sites=n(),#count sites
+                       Yrs_Before=sum(Yrs_Before), #edit moved
+                       Yrs_After=sum(Yrs_After), #edit moved
+                       O_b.grp.=sum(O_b),
+                       O_a.grp.=sum(O_a),
+                       P_b=sum(P_b),
+                       Nexp_b.grp.=sum(Nexp_b), #(9A.1-1)
+                       P_a=sum(P_a), #(9A.1-1)
+                       Nexp_a.grp.=sum(Nexp_a), #(9A.1-4)
+                       Avg_AADTmaj_b=mean(Avg_AADTmaj_b),
+                       Avg_AADTmaj_a=mean(Avg_AADTmaj_a),
+                       OR.grp.i.=OR.grp.i(O_a,Nexp_a), #(9A.1-7)
+                       VAR.grp.=VAR.grp(adj,Nexp_b,w), #(9A.1-9)
+                       OR.grp.=OR.grp(OR.grp.i.,VAR.grp.,Nexp_a), #(9A.1-8)
+                       VarOR.grp.=VarOR.grp(OR.grp.i.,O_a,VAR.grp.,Nexp_a), #(9A.1-11)
+                       SE.grp.=SE.grp(OR.grp.), #(9A.1-10)
+                       Std.Err.OR.grp.=Std.Err.OR.grp(VarOR.grp.), #(9A.1-12)
+                       Std.Err.SE.grp.=Std.Err.SE.grp(Std.Err.OR.grp.), #(9A.1-13)
+                       test_statistic.grp.=test_statistic.grp(SE.grp.,Std.Err.SE.grp.), #Step 14 (a)
+                       Significance.test.grp.=Significance.test(test_statistic.grp.)) |>
+      mutate_if(is.numeric, round, 3) |>
+      rename(
+        "Total Sites"="No.Sites",
+        "Past Base Condition"="Base_Past",
+        "Years in the Before Period"="Yrs_Before",
+        "Average AADT in the Before Period"="Avg_AADTmaj_b",
+        "Total Predicted Crashes in the Before Period"="P_b",
+        "Total Observed Crashes in the Before Periods"="O_b.grp.",
+        "Expected Crashes in the Before Period (9A.1-2)"="Nexp_b.grp.",
+        "Average AADT in the After Period"="Avg_AADTmaj_a",
+        "Total Predicted Crashes in the After Period"="P_a",
+        "Total Years in the After Period"="Yrs_After",
+        "Total Expected Crashes in the After Period (9A.1-4)"="Nexp_a.grp.",
+        "Total Observed Crashes in the After Period"="O_a.grp.",
+        "Odds Ratio (9A.1-5)"="OR.grp.i.",
+        "Variance (9A.1-11)"="VAR.grp.",
+        "Unbiased Odds Ratio (9A.1-8)"="OR.grp.",
+        "Variance Odds Ratio"="VarOR.grp.",
+        "Standard Error Odds Ratio (9A.1-12)"="Std.Err.OR.grp.",
+        "Safety Effectiveness (9A.1-10)"="SE.grp.",
+        "Standard Error of Safety Effectiveness (9A.1-13)"="Std.Err.SE.grp.",
+        "Test Statistic (Step 14)"="test_statistic.grp.",
+        "Significance Level (Step 14)"="Significance.test.grp.")
+
+  }
+
+  else if(group==TRUE & segment==FALSE & group_base_by=="Past"){
+
+    Nexpected_b = function(P_b,O_b,w) (P_b*w+(1-w)*O_b) #(9A.1-1)
+
+    Nexpected_a = function(Nexpected_b,adj) (Nexpected_b*adj) #(9A.1-4)
+
+    OR.i = function(O_a,Nexp_a) (O_a)/(Nexp_a) #(9A.1-5) # Lines 72-82 Edit: Removed sum function from denominator and numerator 1/24
+
+    VAR.=function(adj,Nexp_b,w) (adj^(2)*Nexp_b*(1-w)) #(9A.1-9)
+
+    OR.=function(OR.i,VAR.,Nexp_a) (OR.i)/(1+VAR.)/Nexp_a^2 #(9A.1-8)
+
+    SE.=function(OR.) (100*(1-OR.)) # (9A.1-10)
+
+    VarOR.=function(OR.i,O_a,VAR.,Nexp_a) (OR.i)^(2)*(1/(O_a)+(VAR.)/(Nexp_a)^(2)/(1+(VAR.)/(Nexp_a)^2)) #(9A.1-11)
+
+    Std.Err.OR.=function(VarOR.) ((VarOR.)^(1/2)) #(9A.1-12)
+
+    Std.Err.SE.=function(Std.Err.OR.) (100*Std.Err.OR.) #(9A.1-13)
+
+    test_statistic.=function(SE.,Std.Err.SE.)  (abs(SE./Std.Err.SE.)) #Step 14 (a)
+
+    Significance.test=function(test_statistic) ifelse(test_statistic <1.7, "N.S.",
+                                                      ifelse(test_statistic < 2 & test_statistic >= 1.7 ,"90%",
+                                                             ifelse(test_statistic < Inf & test_statistic>= 2.0, "95%",
+                                                                    ifelse(test_statistic==Inf,"Inf",""))))
+    #add if statement for segment=TRUE. This will remove the requirement for ambiguities between intersection and segment treatment types (i.e. minor volume and segment lengths).
+    data |>
+      dplyr::select(starts_with(c("Site_No.","Yrs","Base","C","CMF","Before","After"))) |>
+      pivot_longer(cols = -c(Site_No.:C,CMF,Yrs_Before,Yrs_After), names_to = c(".value", "Year"), names_sep = "_", values_drop_na = TRUE) |>
+      drop_na(Year)|> rowwise() |>
+      dplyr::mutate(
+        P.T.B= if(segment==TRUE) {C*CMF*spf(AADTMAJ=Before.AADT.Major,AADTMIN=NULL,L=L,Base_Condition=Base_Past,Provide_Overdispersion_Factor=FALSE,Segment=TRUE)} else
+        {C*CMF*spf(AADTMAJ=Before.AADT.Major,AADTMIN=Before.AADT.Minor,L=NULL,Base_Condition=Base_Past,Provide_Overdispersion_Factor=FALSE,Segment=FALSE)},
+        P.T.A= if(segment==TRUE) {
+          C*CMF*spf(AADTMAJ=After.AADT.Major,AADTMIN=NULL,L=L,Base_Condition=Base_Past,Provide_Overdispersion_Factor=FALSE,Segment=TRUE)} else
+          {C*CMF*spf(AADTMAJ=After.AADT.Major,AADTMIN=After.AADT.Minor,L=NULL,Base_Condition=Base_Past,Provide_Overdispersion_Factor=FALSE,Segment=FALSE)})|>
+      pivot_wider(
+        names_from = Year,
+        names_sep = "_",
+        values_from = c(Before.AADT.Major,Before.AADT.Minor, After.AADT.Major,After.AADT.Minor, Before.Yr,After.Yr, P.T.B,P.T.A ))%>% rowwise() |> dplyr::mutate( # Begin Table Layout and Empirical Bayes Testing Procedure
+
+          O_b=ifelse(
+            Yrs_Before == 1, rowSums(across(Before.Yr_1)),
+            ifelse(
+              Yrs_Before == 2, rowSums(across(Before.Yr_1:Before.Yr_2)),
+              ifelse(
+                Yrs_Before == 3, rowSums(across(Before.Yr_1:Before.Yr_3)),
+                ifelse(
+                  Yrs_Before == 4, rowSums(across(Before.Yr_1:Before.Yr_4)),
+                  ifelse(
+                    Yrs_Before == 5, rowSums(across(Before.Yr_1:Before.Yr_5)),
+                    ifelse(
+                      Yrs_Before == 6, rowSums(across(Before.Yr_1:Before.Yr_6)),
+                      ifelse(
+                        Yrs_Before == 7, rowSums(across(Before.Yr_1:Before.Yr_7)),
+                        ifelse(
+                          Yrs_Before == 8, rowSums(across(Before.Yr_1:Before.Yr_8)),
+                          ifelse(
+                            Yrs_Before == 9 ~ rowSums(across(Before.Yr_1:Before.Yr_9)),
+                            ifelse(
+                              Yrs_Before == 10 ~ rowSums(across(Before.Yr_1:Before.Yr_10),""))))))))))),
+
+          Avg_AADTmaj_b=ifelse(
+            Yrs_Before == 1, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_1)),
+            ifelse(
+              Yrs_Before == 2, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_2)),
+              ifelse(
+                Yrs_Before == 3, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_3)),
+                ifelse(
+                  Yrs_Before == 4, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_4)),
+                  ifelse(
+                    Yrs_Before == 5, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_5)),
+                    ifelse(
+                      Yrs_Before == 6, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_6)),
+                      ifelse(
+                        Yrs_Before == 7, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_7)),
+                        ifelse(
+                          Yrs_Before == 8, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_8)),
+                          ifelse(
+                            Yrs_Before == 9 ~ rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_9)),
+                            ifelse(
+                              Yrs_Before == 10 ~ rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_10),""))))))))))),
+
+          Avg_AADTmin_b=ifelse(
+            Yrs_Before == 1, rowMeans(across(Before.AADT.Minor_1:Before.AADT.Minor_1)),
+            ifelse(
+              Yrs_Before == 2, rowMeans(across(Before.AADT.Minor_1:Before.AADT.Minor_2)),
+              ifelse(
+                Yrs_Before == 3, rowMeans(across(Before.AADT.Minor_1:Before.AADT.Minor_3)),
+                ifelse(
+                  Yrs_Before == 4, rowMeans(across(Before.AADT.Minor_1:Before.AADT.Minor_4)),
+                  ifelse(
+                    Yrs_Before == 5, rowMeans(across(Before.AADT.Minor_1:Before.AADT.Minor_5)),
+                    ifelse(
+                      Yrs_Before == 6, rowMeans(across(Before.AADT.Minor_1:Before.AADT.Minor_6)),
+                      ifelse(
+                        Yrs_Before == 7, rowMeans(across(Before.AADT.Minor_1:Before.AADT.Minor_7)),
+                        ifelse(
+                          Yrs_Before == 8, rowMeans(across(Before.AADT.Minor_1:Before.AADT.Minor_8)),
+                          ifelse(
+                            Yrs_Before == 9 ~ rowMeans(across(Before.AADT.Minor_1:Before.AADT.Minor_9)),
+                            ifelse(
+                              Yrs_Before == 10 ~ rowMeans(across(Before.AADT.Minor_1:Before.AADT.Minor_10)),"")))))))))),
+
+          P_b=ifelse(
+            Yrs_Before == 1, rowSums(across(P.T.B_1:P.T.B_1)),
+            ifelse(
+              Yrs_Before == 2, rowSums(across(P.T.B_1:P.T.B_2)),
+              ifelse(
+                Yrs_Before == 3, rowSums(across(P.T.B_1:P.T.B_3)),
+                ifelse(
+                  Yrs_Before == 4, rowSums(across(P.T.B_1:P.T.B_4)),
+                  ifelse(
+                    Yrs_Before == 5, rowSums(across(P.T.B_1:P.T.B_5)),
+                    ifelse(
+                      Yrs_Before == 6, rowSums(across(P.T.B_1:P.T.B_6)),
+                      ifelse(
+                        Yrs_Before == 7, rowSums(across(P.T.B_1:P.T.B_7)),
+                        ifelse(
+                          Yrs_Before == 8, rowSums(across(P.T.B_1:P.T.B_8)),
+                          ifelse(
+                            Yrs_Before == 9 ~ rowSums(across(P.T.B_1:P.T.B_9)),
+                            ifelse(
+                              Yrs_Before == 10 ~ rowSums(across(P.T.B_1:P.T.B_10),""))))))))))),
+
+
+          Avg_AADTmaj_a=ifelse(
+            Yrs_After == 1, rowMeans(across(After.AADT.Major_1:After.AADT.Major_1)),
+            ifelse(
+              Yrs_After == 2, rowMeans(across(After.AADT.Major_1:After.AADT.Major_2)),
+              ifelse(
+                Yrs_After == 3, rowMeans(across(After.AADT.Major_1:After.AADT.Major_3)),
+                ifelse(
+                  Yrs_After == 4, rowMeans(across(After.AADT.Major_1:After.AADT.Major_4)),
+                  ifelse(
+                    Yrs_After == 5, rowMeans(across(After.AADT.Major_1:After.AADT.Major_5)),
+                    ifelse(
+                      Yrs_After == 6, rowMeans(across(After.AADT.Major_1:After.AADT.Major_6)),
+                      ifelse(
+                        Yrs_After == 7, rowMeans(across(After.AADT.Major_1:After.AADT.Major_7)),
+                        ifelse(
+                          Yrs_After == 8, rowMeans(across(After.AADT.Major_1:After.AADT.Major_8)),
+                          ifelse(
+                            Yrs_After == 9 ~ rowMeans(across(After.AADT.Major_1:After.AADT.Major_9)),
+                            ifelse(
+                              Yrs_After == 10 ~ rowMeans(across(After.AADT.Major_1:After.AADT.Major_10)),"")))))))))),
+
+          Avg_AADTmin_a=ifelse(
+            Yrs_After == 1, rowMeans(across(After.AADT.Minor_1:After.AADT.Minor_1)),
+            ifelse(
+              Yrs_After == 2, rowMeans(across(After.AADT.Minor_1:After.AADT.Minor_2)),
+              ifelse(
+                Yrs_After == 3, rowMeans(across(After.AADT.Minor_1:After.AADT.Minor_3)),
+                ifelse(
+                  Yrs_After == 4, rowMeans(across(After.AADT.Minor_1:After.AADT.Minor_4)),
+                  ifelse(
+                    Yrs_After == 5, rowMeans(across(After.AADT.Minor_1:After.AADT.Minor_5)),
+                    ifelse(
+                      Yrs_After == 6, rowMeans(across(After.AADT.Minor_1:After.AADT.Minor_6)),
+                      ifelse(
+                        Yrs_After == 7, rowMeans(across(After.AADT.Minor_1:After.AADT.Minor_7)),
+                        ifelse(
+                          Yrs_After == 8, rowMeans(across(After.AADT.Minor_1:After.AADT.Minor_8)),
+                          ifelse(
+                            Yrs_After == 9 ~ rowMeans(across(After.AADT.Minor_1:After.AADT.Minor_9)),
+                            ifelse(
+                              Yrs_After == 10 ~ rowMeans(across(After.AADT.Minor_1:After.AADT.Minor_10)),"")))))))))),
+          P_a=ifelse(
+            Yrs_After == 1, rowSums(across(P.T.A_1:P.T.A_1)),
+            ifelse(
+              Yrs_After == 2, rowSums(across(P.T.A_1:P.T.A_2)),
+              ifelse(
+                Yrs_After == 3, rowSums(across(P.T.A_1:P.T.A_3)),
+                ifelse(
+                  Yrs_After == 4, rowSums(across(P.T.A_1:P.T.A_4)),
+                  ifelse(
+                    Yrs_After == 5, rowSums(across(P.T.A_1:P.T.A_5)),
+                    ifelse(
+                      Yrs_After == 6, rowSums(across(P.T.A_1:P.T.A_6)),
+                      ifelse(
+                        Yrs_After == 7, rowSums(across(P.T.A_1:P.T.A_7)),
+                        ifelse(
+                          Yrs_After == 8, rowSums(across(P.T.A_1:P.T.A_8)),
+                          ifelse(
+                            Yrs_After == 9 ~ rowSums(across(P.T.A_1:P.T.A_9)),
+                            ifelse(
+                              Yrs_After == 10 ~ rowSums(across(P.T.A_1:P.T.A_10),""))))))))))),
+
+          k=if(segment==TRUE) {
+            spf(L=L,Base_Condition=Base_Past,Provide_Overdispersion_Factor=TRUE,Segment=TRUE)} else
+            {
+              spf(AADTMAJ=NULL,AADTMIN=NULL,L=NULL,Base_Condition=Base_Past,Provide_Overdispersion_Factor=TRUE,Segment=FALSE)},
+
+          w=(1/(1+k*P_b)), # (9A.1-2)
+
+          adj=(P_a/P_b),  # (9A.1-3)
+
+          Nexp_b= Nexpected_b(P_b,O_b,w), # Nexp,b=Predicted*w+(1-w)O_bs,b; HSM (9A.1-4) #bayes estimates
+
+          Nexp_a=Nexpected_a(Nexp_b,adj), # (9A.1-4)
+
+          O_a=ifelse(
+            Yrs_After == 1, rowSums(across(After.Yr_1)),
+            ifelse(
+              Yrs_After == 2, rowSums(across(After.Yr_1:After.Yr_2)),
+              ifelse(
+                Yrs_After == 3, rowSums(across(After.Yr_1:After.Yr_3)),
+                ifelse(
+                  Yrs_After == 4, rowSums(across(After.Yr_1:After.Yr_4)),
+                  ifelse(
+                    Yrs_After == 5, rowSums(across(After.Yr_1:After.Yr_5)),
+                    ifelse(
+                      Yrs_After == 6, rowSums(across(After.Yr_1:After.Yr_6)),
+                      ifelse(
+                        Yrs_After == 7, rowSums(across(After.Yr_1:After.Yr_7)),
+                        ifelse(
+                          Yrs_After == 8, rowSums(across(After.Yr_1:After.Yr_8)),
+                          ifelse(
+                            Yrs_After == 9 ~ rowSums(across(After.Yr_1:After.Yr_9)),
+                            ifelse(
+                              Yrs_After == 10 ~ rowSums(across(After.Yr_1:After.Yr_10),""))))))))))),
+
+          ORi= OR.i(O_a,Nexp_a),#Observed,a/Expected,a; HSM (9A.1-5)
+
+          Var.=VAR.(adj,Nexp_b,w),#(9A.1-9)
+
+          OR=OR.(ORi,Var.,Nexp_a), #(9A.1-8)
+
+          SE=SE.(ORi), #correction from OR to ORi
+
+          VarOR=VarOR.(ORi,O_a,Var.,Nexp_a),#9A.1-11
+
+          Std.Err_OR=Std.Err.OR.(VarOR),#9A.1-12
+
+          Std.Err.SE=(Std.Err_OR*100),#9A.1-13
+
+          test_statistic=abs(SE/Std.Err.SE), #Step 14 (a) & (b)
+          Significance=Significance.test(test_statistic)) %>% dplyr::select(Site_No.:C,CMF,O_b:Significance)|> mutate_if(is.numeric, round, 3) -> data
+
+
+
+
+    #pooling or grouping functions (grp)
+    OR.grp.i = function(O_a,Nexp_a) sum(O_a)/sum(Nexp_a) #(9A.1-7)
+
+    VAR.grp=function(adj,Nexp_b,w) sum(adj^(2)*Nexp_b*(1-w)) #(9A.1-9) #edited. summation over entire function
+
+    OR.grp=function(OR.grp.i,VAR.grp,Nexp_a) sum(OR.grp.i)/(1+sum(VAR.grp)/sum(Nexp_a)^2) # (9A.1-8) #edited switched sum(Nexp_a^2) to sum(Nexp_a)^2
+
+    SE.grp=function(OR.grp) 100*(1-sum(OR.grp)) #(9A.1-10)
+
+    VarOR.grp=function(OR.grp.i,O_a,VAR.grp,Nexp_a) sum(OR.grp.i)^(2)*(1/sum(O_a)+sum(VAR.grp)/sum(Nexp_a)^(2)/(1+sum(VAR.grp)/sum(Nexp_a)^2)) #(9A.1-11)
+
+    Std.Err.OR.grp=function(VarOR.grp) sum(VarOR.grp)^(1/2) #(9A.1-12)
+
+    Std.Err.SE.grp=function(Std.Err.OR.grp) 100*sum(Std.Err.OR.grp) #(9A.1-13)
+
+    test_statistic.grp=function(SE.grp,Std.Err.SE.grp)  abs(sum(SE.grp)/sum(Std.Err.SE.grp))  #Step 14 (a)
+
+
+    data %>%
+      group_by(Base_Past) |>
+      dplyr::summarise(No.Sites=n(),#count sites
+                       Yrs_Before=sum(Yrs_Before), #edit moved
+                       Yrs_After=sum(Yrs_After), #edit moved
+                       O_b.grp.=sum(O_b),
+                       O_a.grp.=sum(O_a),
+                       P_b=sum(P_b),
+                       Nexp_b.grp.=sum(Nexp_b), #(9A.1-1)
+                       P_a=sum(P_a), #(9A.1-1)
+                       Nexp_a.grp.=sum(Nexp_a), #(9A.1-4)
+                       Avg_AADTmaj_b=mean(Avg_AADTmaj_b),
+                       Avg_AADTmin_b=mean(Avg_AADTmin_b),
+                       Avg_AADTmaj_a=mean(Avg_AADTmaj_a),
+                       Avg_AADTmin_a=mean(Avg_AADTmin_a),
+                       OR.grp.i.=OR.grp.i(O_a,Nexp_a), #(9A.1-7)
+                       VAR.grp.=VAR.grp(adj,Nexp_b,w), #(9A.1-9)
+                       OR.grp.=OR.grp(OR.grp.i.,VAR.grp.,Nexp_a), #(9A.1-8)
+                       VarOR.grp.=VarOR.grp(OR.grp.i.,O_a,VAR.grp.,Nexp_a), #(9A.1-11)
+                       SE.grp.=SE.grp(OR.grp.), #(9A.1-10)
+                       Std.Err.OR.grp.=Std.Err.OR.grp(VarOR.grp.), #(9A.1-12)
+                       Std.Err.SE.grp.=Std.Err.SE.grp(Std.Err.OR.grp.), #(9A.1-13)
+                       test_statistic.grp.=test_statistic.grp(SE.grp.,Std.Err.SE.grp.), #Step 14 (a)
+                       Significance.test.grp.=Significance.test(test_statistic.grp.)) |>
+      mutate_if(is.numeric, round, 3) |>
+      rename(
+        "Total Sites"="No.Sites",
+        "Past Base Condition"="Base_Past",
+        "Years in the Before Period"="Yrs_Before",
+        "Average Major AADT in the Before Period"="Avg_AADTmaj_b",
+        "Average Minor AADT in the Before Period"="Avg_AADTmin_b",
+        "Total Predicted Crashes in the Before Period"="P_b",
+        "Total Observed Crashes in the Before Periods"="O_b.grp.",
+        "Expected Crashes in the Before Period (9A.1-2)"="Nexp_b.grp.",
+        "Average Major AADT in the After Period"="Avg_AADTmaj_a",
+        "Average Minor AADT in the After Period"="Avg_AADTmin_a",
+        "Total Predicted Crashes in the After Period"="P_a",
+        "Total Years in the After Period"="Yrs_After",
+        "Total Expected Crashes in the After Period (9A.1-4)"="Nexp_a.grp.",
+        "Total Observed Crashes in the After Period"="O_a.grp.",
+        "Odds Ratio (9A.1-5)"="OR.grp.i.",
+        "Variance (9A.1-11)"="VAR.grp.",
+        "Unbiased Odds Ratio (9A.1-8)"="OR.grp.",
+        "Variance Odds Ratio"="VarOR.grp.",
+        "Standard Error Odds Ratio (9A.1-12)"="Std.Err.OR.grp.",
+        "Safety Effectiveness (9A.1-10)"="SE.grp.",
+        "Standard Error of Safety Effectiveness (9A.1-13)"="Std.Err.SE.grp.",
+        "Test Statistic (Step 14)"="test_statistic.grp.",
+        "Significance Level (Step 14)"="Significance.test.grp.")
+
+  }
+
+  else if(group==TRUE & segment==FALSE & group_base_by=="Current"){
+
+    Nexpected_b = function(P_b,O_b,w) (P_b*w+(1-w)*O_b) #(9A.1-1)
+
+    Nexpected_a = function(Nexpected_b,adj) (Nexpected_b*adj) #(9A.1-4)
+
+    OR.i = function(O_a,Nexp_a) (O_a)/(Nexp_a) #(9A.1-5) # Lines 72-82 Edit: Removed sum function from denominator and numerator 1/24
+
+    VAR.=function(adj,Nexp_b,w) (adj^(2)*Nexp_b*(1-w)) #(9A.1-9)
+
+    OR.=function(OR.i,VAR.,Nexp_a) (OR.i)/(1+VAR.)/Nexp_a^2 #(9A.1-8)
+
+    SE.=function(OR.) (100*(1-OR.)) # (9A.1-10)
+
+    VarOR.=function(OR.i,O_a,VAR.,Nexp_a) (OR.i)^(2)*(1/(O_a)+(VAR.)/(Nexp_a)^(2)/(1+(VAR.)/(Nexp_a)^2)) #(9A.1-11)
+
+    Std.Err.OR.=function(VarOR.) ((VarOR.)^(1/2)) #(9A.1-12)
+
+    Std.Err.SE.=function(Std.Err.OR.) (100*Std.Err.OR.) #(9A.1-13)
+
+    test_statistic.=function(SE.,Std.Err.SE.)  (abs(SE./Std.Err.SE.)) #Step 14 (a)
+
+    Significance.test=function(test_statistic) ifelse(test_statistic <1.7, "N.S.",
+                                                      ifelse(test_statistic < 2 & test_statistic >= 1.7 ,"90%",
+                                                             ifelse(test_statistic < Inf & test_statistic>= 2.0, "95%",
+                                                                    ifelse(test_statistic==Inf,"Inf",""))))
+    #add if statement for segment=TRUE. This will remove the requirement for ambiguities between intersection and segment treatment types (i.e. minor volume and segment lengths).
+    data |>
+      dplyr::select(starts_with(c("Site_No.","Yrs","Base","C","CMF","Before","After"))) |>
+      pivot_longer(cols = -c(Site_No.:C,CMF,Yrs_Before,Yrs_After), names_to = c(".value", "Year"), names_sep = "_", values_drop_na = TRUE) |>
+      drop_na(Year)|> rowwise() |>
+      dplyr::mutate(
+        P.T.B= if(segment==TRUE) {C*CMF*spf(AADTMAJ=Before.AADT.Major,AADTMIN=NULL,L=L,Base_Condition=Base_Past,Provide_Overdispersion_Factor=FALSE,Segment=TRUE)} else
+        {C*CMF*spf(AADTMAJ=Before.AADT.Major,AADTMIN=Before.AADT.Minor,L=NULL,Base_Condition=Base_Past,Provide_Overdispersion_Factor=FALSE,Segment=FALSE)},
+        P.T.A= if(segment==TRUE) {
+          C*CMF*spf(AADTMAJ=After.AADT.Major,AADTMIN=NULL,L=L,Base_Condition=Base_Past,Provide_Overdispersion_Factor=FALSE,Segment=TRUE)} else
+          {C*CMF*spf(AADTMAJ=After.AADT.Major,AADTMIN=After.AADT.Minor,L=NULL,Base_Condition=Base_Past,Provide_Overdispersion_Factor=FALSE,Segment=FALSE)})|>
+      pivot_wider(
+        names_from = Year,
+        names_sep = "_",
+        values_from = c(Before.AADT.Major,Before.AADT.Minor, After.AADT.Major,After.AADT.Minor, Before.Yr,After.Yr, P.T.B,P.T.A ))%>% rowwise() |> dplyr::mutate( # Begin Table Layout and Empirical Bayes Testing Procedure
+
+          O_b=ifelse(
+            Yrs_Before == 1, rowSums(across(Before.Yr_1)),
+            ifelse(
+              Yrs_Before == 2, rowSums(across(Before.Yr_1:Before.Yr_2)),
+              ifelse(
+                Yrs_Before == 3, rowSums(across(Before.Yr_1:Before.Yr_3)),
+                ifelse(
+                  Yrs_Before == 4, rowSums(across(Before.Yr_1:Before.Yr_4)),
+                  ifelse(
+                    Yrs_Before == 5, rowSums(across(Before.Yr_1:Before.Yr_5)),
+                    ifelse(
+                      Yrs_Before == 6, rowSums(across(Before.Yr_1:Before.Yr_6)),
+                      ifelse(
+                        Yrs_Before == 7, rowSums(across(Before.Yr_1:Before.Yr_7)),
+                        ifelse(
+                          Yrs_Before == 8, rowSums(across(Before.Yr_1:Before.Yr_8)),
+                          ifelse(
+                            Yrs_Before == 9 ~ rowSums(across(Before.Yr_1:Before.Yr_9)),
+                            ifelse(
+                              Yrs_Before == 10 ~ rowSums(across(Before.Yr_1:Before.Yr_10),""))))))))))),
+
+          Avg_AADTmaj_b=ifelse(
+            Yrs_Before == 1, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_1)),
+            ifelse(
+              Yrs_Before == 2, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_2)),
+              ifelse(
+                Yrs_Before == 3, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_3)),
+                ifelse(
+                  Yrs_Before == 4, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_4)),
+                  ifelse(
+                    Yrs_Before == 5, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_5)),
+                    ifelse(
+                      Yrs_Before == 6, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_6)),
+                      ifelse(
+                        Yrs_Before == 7, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_7)),
+                        ifelse(
+                          Yrs_Before == 8, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_8)),
+                          ifelse(
+                            Yrs_Before == 9 ~ rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_9)),
+                            ifelse(
+                              Yrs_Before == 10 ~ rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_10),""))))))))))),
+
+          Avg_AADTmin_b=ifelse(
+            Yrs_Before == 1, rowMeans(across(Before.AADT.Minor_1:Before.AADT.Minor_1)),
+            ifelse(
+              Yrs_Before == 2, rowMeans(across(Before.AADT.Minor_1:Before.AADT.Minor_2)),
+              ifelse(
+                Yrs_Before == 3, rowMeans(across(Before.AADT.Minor_1:Before.AADT.Minor_3)),
+                ifelse(
+                  Yrs_Before == 4, rowMeans(across(Before.AADT.Minor_1:Before.AADT.Minor_4)),
+                  ifelse(
+                    Yrs_Before == 5, rowMeans(across(Before.AADT.Minor_1:Before.AADT.Minor_5)),
+                    ifelse(
+                      Yrs_Before == 6, rowMeans(across(Before.AADT.Minor_1:Before.AADT.Minor_6)),
+                      ifelse(
+                        Yrs_Before == 7, rowMeans(across(Before.AADT.Minor_1:Before.AADT.Minor_7)),
+                        ifelse(
+                          Yrs_Before == 8, rowMeans(across(Before.AADT.Minor_1:Before.AADT.Minor_8)),
+                          ifelse(
+                            Yrs_Before == 9 ~ rowMeans(across(Before.AADT.Minor_1:Before.AADT.Minor_9)),
+                            ifelse(
+                              Yrs_Before == 10 ~ rowMeans(across(Before.AADT.Minor_1:Before.AADT.Minor_10)),"")))))))))),
+
+          P_b=ifelse(
+            Yrs_Before == 1, rowSums(across(P.T.B_1:P.T.B_1)),
+            ifelse(
+              Yrs_Before == 2, rowSums(across(P.T.B_1:P.T.B_2)),
+              ifelse(
+                Yrs_Before == 3, rowSums(across(P.T.B_1:P.T.B_3)),
+                ifelse(
+                  Yrs_Before == 4, rowSums(across(P.T.B_1:P.T.B_4)),
+                  ifelse(
+                    Yrs_Before == 5, rowSums(across(P.T.B_1:P.T.B_5)),
+                    ifelse(
+                      Yrs_Before == 6, rowSums(across(P.T.B_1:P.T.B_6)),
+                      ifelse(
+                        Yrs_Before == 7, rowSums(across(P.T.B_1:P.T.B_7)),
+                        ifelse(
+                          Yrs_Before == 8, rowSums(across(P.T.B_1:P.T.B_8)),
+                          ifelse(
+                            Yrs_Before == 9 ~ rowSums(across(P.T.B_1:P.T.B_9)),
+                            ifelse(
+                              Yrs_Before == 10 ~ rowSums(across(P.T.B_1:P.T.B_10),""))))))))))),
+
+
+          Avg_AADTmaj_a=ifelse(
+            Yrs_After == 1, rowMeans(across(After.AADT.Major_1:After.AADT.Major_1)),
+            ifelse(
+              Yrs_After == 2, rowMeans(across(After.AADT.Major_1:After.AADT.Major_2)),
+              ifelse(
+                Yrs_After == 3, rowMeans(across(After.AADT.Major_1:After.AADT.Major_3)),
+                ifelse(
+                  Yrs_After == 4, rowMeans(across(After.AADT.Major_1:After.AADT.Major_4)),
+                  ifelse(
+                    Yrs_After == 5, rowMeans(across(After.AADT.Major_1:After.AADT.Major_5)),
+                    ifelse(
+                      Yrs_After == 6, rowMeans(across(After.AADT.Major_1:After.AADT.Major_6)),
+                      ifelse(
+                        Yrs_After == 7, rowMeans(across(After.AADT.Major_1:After.AADT.Major_7)),
+                        ifelse(
+                          Yrs_After == 8, rowMeans(across(After.AADT.Major_1:After.AADT.Major_8)),
+                          ifelse(
+                            Yrs_After == 9 ~ rowMeans(across(After.AADT.Major_1:After.AADT.Major_9)),
+                            ifelse(
+                              Yrs_After == 10 ~ rowMeans(across(After.AADT.Major_1:After.AADT.Major_10)),"")))))))))),
+
+          Avg_AADTmin_a=ifelse(
+            Yrs_After == 1, rowMeans(across(After.AADT.Minor_1:After.AADT.Minor_1)),
+            ifelse(
+              Yrs_After == 2, rowMeans(across(After.AADT.Minor_1:After.AADT.Minor_2)),
+              ifelse(
+                Yrs_After == 3, rowMeans(across(After.AADT.Minor_1:After.AADT.Minor_3)),
+                ifelse(
+                  Yrs_After == 4, rowMeans(across(After.AADT.Minor_1:After.AADT.Minor_4)),
+                  ifelse(
+                    Yrs_After == 5, rowMeans(across(After.AADT.Minor_1:After.AADT.Minor_5)),
+                    ifelse(
+                      Yrs_After == 6, rowMeans(across(After.AADT.Minor_1:After.AADT.Minor_6)),
+                      ifelse(
+                        Yrs_After == 7, rowMeans(across(After.AADT.Minor_1:After.AADT.Minor_7)),
+                        ifelse(
+                          Yrs_After == 8, rowMeans(across(After.AADT.Minor_1:After.AADT.Minor_8)),
+                          ifelse(
+                            Yrs_After == 9 ~ rowMeans(across(After.AADT.Minor_1:After.AADT.Minor_9)),
+                            ifelse(
+                              Yrs_After == 10 ~ rowMeans(across(After.AADT.Minor_1:After.AADT.Minor_10)),"")))))))))),
+          P_a=ifelse(
+            Yrs_After == 1, rowSums(across(P.T.A_1:P.T.A_1)),
+            ifelse(
+              Yrs_After == 2, rowSums(across(P.T.A_1:P.T.A_2)),
+              ifelse(
+                Yrs_After == 3, rowSums(across(P.T.A_1:P.T.A_3)),
+                ifelse(
+                  Yrs_After == 4, rowSums(across(P.T.A_1:P.T.A_4)),
+                  ifelse(
+                    Yrs_After == 5, rowSums(across(P.T.A_1:P.T.A_5)),
+                    ifelse(
+                      Yrs_After == 6, rowSums(across(P.T.A_1:P.T.A_6)),
+                      ifelse(
+                        Yrs_After == 7, rowSums(across(P.T.A_1:P.T.A_7)),
+                        ifelse(
+                          Yrs_After == 8, rowSums(across(P.T.A_1:P.T.A_8)),
+                          ifelse(
+                            Yrs_After == 9 ~ rowSums(across(P.T.A_1:P.T.A_9)),
+                            ifelse(
+                              Yrs_After == 10 ~ rowSums(across(P.T.A_1:P.T.A_10),""))))))))))),
+
+          k=if(segment==TRUE) {
+            spf(L=L,Base_Condition=Base_Past,Provide_Overdispersion_Factor=TRUE,Segment=TRUE)} else
+            {
+              spf(AADTMAJ=NULL,AADTMIN=NULL,L=NULL,Base_Condition=Base_Past,Provide_Overdispersion_Factor=TRUE,Segment=FALSE)},
+
+          w=(1/(1+k*P_b)), # (9A.1-2)
+
+          adj=(P_a/P_b),  # (9A.1-3)
+
+          Nexp_b= Nexpected_b(P_b,O_b,w), # Nexp,b=Predicted*w+(1-w)O_bs,b; HSM (9A.1-4) #bayes estimates
+
+          Nexp_a=Nexpected_a(Nexp_b,adj), # (9A.1-4)
+
+          O_a=ifelse(
+            Yrs_After == 1, rowSums(across(After.Yr_1)),
+            ifelse(
+              Yrs_After == 2, rowSums(across(After.Yr_1:After.Yr_2)),
+              ifelse(
+                Yrs_After == 3, rowSums(across(After.Yr_1:After.Yr_3)),
+                ifelse(
+                  Yrs_After == 4, rowSums(across(After.Yr_1:After.Yr_4)),
+                  ifelse(
+                    Yrs_After == 5, rowSums(across(After.Yr_1:After.Yr_5)),
+                    ifelse(
+                      Yrs_After == 6, rowSums(across(After.Yr_1:After.Yr_6)),
+                      ifelse(
+                        Yrs_After == 7, rowSums(across(After.Yr_1:After.Yr_7)),
+                        ifelse(
+                          Yrs_After == 8, rowSums(across(After.Yr_1:After.Yr_8)),
+                          ifelse(
+                            Yrs_After == 9 ~ rowSums(across(After.Yr_1:After.Yr_9)),
+                            ifelse(
+                              Yrs_After == 10 ~ rowSums(across(After.Yr_1:After.Yr_10),""))))))))))),
+
+          ORi= OR.i(O_a,Nexp_a),#Observed,a/Expected,a; HSM (9A.1-5)
+
+          Var.=VAR.(adj,Nexp_b,w),#(9A.1-9)
+
+          OR=OR.(ORi,Var.,Nexp_a), #(9A.1-8)
+
+          SE=SE.(ORi), #correction from OR to ORi
+
+          VarOR=VarOR.(ORi,O_a,Var.,Nexp_a),#9A.1-11
+
+          Std.Err_OR=Std.Err.OR.(VarOR),#9A.1-12
+
+          Std.Err.SE=(Std.Err_OR*100),#9A.1-13
+
+          test_statistic=abs(SE/Std.Err.SE), #Step 14 (a) & (b)
+          Significance=Significance.test(test_statistic)) %>% dplyr::select(Site_No.:C,CMF,O_b:Significance)|> mutate_if(is.numeric, round, 3) -> data
+
+
+
+
+    #pooling or grouping functions (grp)
+    OR.grp.i = function(O_a,Nexp_a) sum(O_a)/sum(Nexp_a) #(9A.1-7)
+
+    VAR.grp=function(adj,Nexp_b,w) sum(adj^(2)*Nexp_b*(1-w)) #(9A.1-9) #edited. summation over entire function
+
+    OR.grp=function(OR.grp.i,VAR.grp,Nexp_a) sum(OR.grp.i)/(1+sum(VAR.grp)/sum(Nexp_a)^2) # (9A.1-8) #edited switched sum(Nexp_a^2) to sum(Nexp_a)^2
+
+    SE.grp=function(OR.grp) 100*(1-sum(OR.grp)) #(9A.1-10)
+
+    VarOR.grp=function(OR.grp.i,O_a,VAR.grp,Nexp_a) sum(OR.grp.i)^(2)*(1/sum(O_a)+sum(VAR.grp)/sum(Nexp_a)^(2)/(1+sum(VAR.grp)/sum(Nexp_a)^2)) #(9A.1-11)
+
+    Std.Err.OR.grp=function(VarOR.grp) sum(VarOR.grp)^(1/2) #(9A.1-12)
+
+    Std.Err.SE.grp=function(Std.Err.OR.grp) 100*sum(Std.Err.OR.grp) #(9A.1-13)
+
+    test_statistic.grp=function(SE.grp,Std.Err.SE.grp)  abs(sum(SE.grp)/sum(Std.Err.SE.grp))  #Step 14 (a)
+
+
+    data %>%
+      group_by(Base_Current) |>
+      dplyr::summarise(No.Sites=n(),#count sites
+                       Yrs_Before=sum(Yrs_Before), #edit moved
+                       Yrs_After=sum(Yrs_After), #edit moved
+                       O_b.grp.=sum(O_b),
+                       O_a.grp.=sum(O_a),
+                       P_b=sum(P_b),
+                       Nexp_b.grp.=sum(Nexp_b), #(9A.1-1)
+                       P_a=sum(P_a), #(9A.1-1)
+                       Nexp_a.grp.=sum(Nexp_a), #(9A.1-4)
+                       Avg_AADTmaj_b=mean(Avg_AADTmaj_b),
+                       Avg_AADTmin_b=mean(Avg_AADTmin_b),
+                       Avg_AADTmaj_a=mean(Avg_AADTmaj_a),
+                       Avg_AADTmin_a=mean(Avg_AADTmin_a),
+                       OR.grp.i.=OR.grp.i(O_a,Nexp_a), #(9A.1-7)
+                       VAR.grp.=VAR.grp(adj,Nexp_b,w), #(9A.1-9)
+                       OR.grp.=OR.grp(OR.grp.i.,VAR.grp.,Nexp_a), #(9A.1-8)
+                       VarOR.grp.=VarOR.grp(OR.grp.i.,O_a,VAR.grp.,Nexp_a), #(9A.1-11)
+                       SE.grp.=SE.grp(OR.grp.), #(9A.1-10)
+                       Std.Err.OR.grp.=Std.Err.OR.grp(VarOR.grp.), #(9A.1-12)
+                       Std.Err.SE.grp.=Std.Err.SE.grp(Std.Err.OR.grp.), #(9A.1-13)
+                       test_statistic.grp.=test_statistic.grp(SE.grp.,Std.Err.SE.grp.), #Step 14 (a)
+                       Significance.test.grp.=Significance.test(test_statistic.grp.)) |>
+      mutate_if(is.numeric, round, 3) |>
+      rename(
+        "Total Sites"="No.Sites",
+        "Past Base Condition"="Base_Current",
+        "Years in the Before Period"="Yrs_Before",
+        "Average Major AADT in the Before Period"="Avg_AADTmaj_b",
+        "Average Minor AADT in the Before Period"="Avg_AADTmin_b",
+        "Total Predicted Crashes in the Before Period"="P_b",
+        "Total Observed Crashes in the Before Periods"="O_b.grp.",
+        "Expected Crashes in the Before Period (9A.1-2)"="Nexp_b.grp.",
+        "Average Major AADT in the After Period"="Avg_AADTmaj_a",
+        "Average Minor AADT in the After Period"="Avg_AADTmin_a",
+        "Total Predicted Crashes in the After Period"="P_a",
+        "Total Years in the After Period"="Yrs_After",
+        "Total Expected Crashes in the After Period (9A.1-4)"="Nexp_a.grp.",
+        "Total Observed Crashes in the After Period"="O_a.grp.",
+        "Odds Ratio (9A.1-5)"="OR.grp.i.",
+        "Variance (9A.1-11)"="VAR.grp.",
+        "Unbiased Odds Ratio (9A.1-8)"="OR.grp.",
+        "Variance Odds Ratio"="VarOR.grp.",
+        "Standard Error Odds Ratio (9A.1-12)"="Std.Err.OR.grp.",
+        "Safety Effectiveness (9A.1-10)"="SE.grp.",
+        "Standard Error of Safety Effectiveness (9A.1-13)"="Std.Err.SE.grp.",
+        "Test Statistic (Step 14)"="test_statistic.grp.",
+        "Significance Level (Step 14)"="Significance.test.grp.")
+
+  }
+
+
+else if(group==FALSE & segment==FALSE ){
+
   Nexpected_b = function(P_b,O_b,w) (P_b*w+(1-w)*O_b) #(9A.1-1)
 
   Nexpected_a = function(Nexpected_b,adj) (Nexpected_b*adj) #(9A.1-4)
@@ -43,11 +1211,11 @@ HSM_9_35 = function(data,group,segment){{
                                                     ifelse(test_statistic < 2 & test_statistic >= 1.7 ,"90%",
                                                            ifelse(test_statistic < Inf & test_statistic>= 2.0, "95%",
                                                                   ifelse(test_statistic==Inf,"Inf",""))))
-
+  #add if statement for segment=TRUE. This will remove the requirement for ambiguities between intersection and segment treatment types (i.e. minor volume and segment lengths).
   data |>
-    dplyr::select(starts_with(c("Site_No.","Yrs","Base","L","C","CMF","Before","After"))) |>
+    dplyr::select(starts_with(c("Site_No.","Yrs","Base","C","CMF","Before","After"))) |>
     pivot_longer(cols = -c(Site_No.:C,CMF,Yrs_Before,Yrs_After), names_to = c(".value", "Year"), names_sep = "_", values_drop_na = TRUE) |>
-    fill(L, .direction = "downup") |>
+
     drop_na(Year)|> rowwise() |>
     dplyr::mutate(
       P.T.B= if(segment==TRUE) {C*CMF*spf(AADTMAJ=Before.AADT.Major,AADTMIN=NULL,L=L,Base_Condition=Base_Past,Provide_Overdispersion_Factor=FALSE,Segment=TRUE)} else
@@ -256,110 +1424,281 @@ HSM_9_35 = function(data,group,segment){{
         Std.Err.SE=(Std.Err_OR*100),#9A.1-13
 
         test_statistic=abs(SE/Std.Err.SE), #Step 14 (a) & (b)
-        Significance=Significance.test(test_statistic)) %>% dplyr::select(Site_No.:C,CMF,O_b:Significance)|> mutate_if(is.numeric, round, 3) -> data
-
-  }
-
-if(group==TRUE){
-
-  #pooling or grouping functions (grp)
-  OR.grp.i = function(O_a,Nexp_a) sum(O_a)/sum(Nexp_a) #(9A.1-7)
-
-  VAR.grp=function(adj,Nexp_b,w) sum(adj^(2)*Nexp_b*(1-w)) #(9A.1-9) #edited. summation over entire function
-
-  OR.grp=function(OR.grp.i,VAR.grp,Nexp_a) sum(OR.grp.i)/(1+sum(VAR.grp)/sum(Nexp_a)^2) # (9A.1-8) #edited switched sum(Nexp_a^2) to sum(Nexp_a)^2
-
-  SE.grp=function(OR.grp) 100*(1-sum(OR.grp)) #(9A.1-10)
-
-  VarOR.grp=function(OR.grp.i,O_a,VAR.grp,Nexp_a) sum(OR.grp.i)^(2)*(1/sum(O_a)+sum(VAR.grp)/sum(Nexp_a)^(2)/(1+sum(VAR.grp)/sum(Nexp_a)^2)) #(9A.1-11)
-
-  Std.Err.OR.grp=function(VarOR.grp) sum(VarOR.grp)^(1/2) #(9A.1-12)
-
-  Std.Err.SE.grp=function(Std.Err.OR.grp) 100*sum(Std.Err.OR.grp) #(9A.1-13)
-
-  test_statistic.grp=function(SE.grp,Std.Err.SE.grp)  abs(sum(SE.grp)/sum(Std.Err.SE.grp))  #Step 14 (a)
-
-
-    data %>%
-      group_by(Base_Past) |>
-      dplyr::summarise(No.Sites=n(),#count sites
-                       Yrs_Before=sum(Yrs_Before), #edit moved
-                       Yrs_After=sum(Yrs_After), #edit moved
-                       O_b.grp.=sum(O_b),
-                       O_a.grp.=sum(O_a),
-                       P_b=sum(P_b),
-                       Nexp_b.grp.=sum(Nexp_b), #(9A.1-1)
-                       P_a=sum(P_a), #(9A.1-1)
-                       Nexp_a.grp.=sum(Nexp_a), #(9A.1-4)
-                       Avg_AADTmaj_b=mean(Avg_AADTmaj_b),
-                       Avg_AADTmaj_a=mean(Avg_AADTmaj_a),
-                       OR.grp.i.=OR.grp.i(O_a,Nexp_a), #(9A.1-7)
-                       VAR.grp.=VAR.grp(adj,Nexp_b,w), #(9A.1-9)
-                       OR.grp.=OR.grp(OR.grp.i.,VAR.grp.,Nexp_a), #(9A.1-8)
-                       VarOR.grp.=VarOR.grp(OR.grp.i.,O_a,VAR.grp.,Nexp_a), #(9A.1-11)
-                       SE.grp.=SE.grp(OR.grp.), #(9A.1-10)
-                       Std.Err.OR.grp.=Std.Err.OR.grp(VarOR.grp.), #(9A.1-12)
-                       Std.Err.SE.grp.=Std.Err.SE.grp(Std.Err.OR.grp.), #(9A.1-13)
-                       test_statistic.grp.=test_statistic.grp(SE.grp.,Std.Err.SE.grp.), #Step 14 (a)
-                       Significance.test.grp.=Significance.test(test_statistic.grp.)) |>
-                         mutate_if(is.numeric, round, 3) |>
-                         rename(
-                         "Total Sites"="No.Sites",
-                         "Past Base Condition"="Base_Past",
-                         "Years in the Before Period"="Yrs_Before",
-                         "Average AADT in the Before Period"="Avg_AADTmaj_b",
-                         "Total Predicted Crashes in the Before Period"="P_b",
-                         "Total Observed Crashes in the Before Periods"="O_b.grp.",
-                         "Expected Crashes in the Before Period (9A.1-2)"="Nexp_b.grp.",
-                         "Average AADT in the After Period"="Avg_AADTmaj_a",
-                         "Total Predicted Crashes in the After Period"="P_a",
-                         "Total Years in the After Period"="Yrs_After",
-                         "Total Expected Crashes in the After Period (9A.1-4)"="Nexp_a.grp.",
-                         "Total Observed Crashes in the After Period"="O_a.grp.",
-                         "Odds Ratio (9A.1-5)"="OR.grp.i.",
-                         "Variance (9A.1-9)"="VAR.grp.",
-                         "Unbiased Odds Ratio (9A.1-8)"="OR.grp.",
-                         "Variance Odds Ratio (9A.1-11)"="VarOR.grp.",
-                         "Standard Error Odds Ratio (9A.1-12)"="Std.Err.OR.grp.",
-                         "Safety Effectiveness (9A.1-10)"="SE.grp.",
-                         "Standard Error of Safety Effectiveness (9A.1-13)"="Std.Err.SE.grp.",
-                         "Test Statistic (Step 14)"="test_statistic.grp.",
-                         "Significance Level (Step 14)"="Significance.test.grp.")
-
-  }
-
-else{
-    data |> rename(
+        Significance=Significance.test(test_statistic)) %>% dplyr::select(Site_No.:C,CMF,O_b:Significance)|> mutate_if(is.numeric, round, 3) %>% rename(
       "Past Base Condition"="Base_Past",
-             "Current Base Condition"="Base_Current",
-             "Years in the Before Period"="Yrs_Before",
-             "Calibration Factor"="C",
-             "Crash Modification Factor"="CMF",
-             "Segment Length"="L",
-             "Average AADT in the Before Period"="Avg_AADTmaj_b",
-             "Predicted Crashes in the Before Period"="P_b",
-             "Observed Crashes in the Before Periods"="O_b",
-             "Overdisperion Factor"="k",
-             "Weight (9A.1-2)"="w",
-             "Expected Crashes in the Before Period (9A.1-2)"="Nexp_b",
-             "Average AADT in the After Period"="Avg_AADTmaj_a",
-             "Predicted Crashes in the After Period"="P_a",
-             "Years in the After Period"="Yrs_After",
-             "Adjustment Factor (9A.1-3)"="adj",
-             "Expected Crashes in the After Period (9A.1-4)"="Nexp_a",
-             "Observed Crashes in the After Period"="O_a",
-             "Odds Ratio (9A.1-5)"="ORi",
-             "Variance (9A.1-9)"="Var.",
-             "Unbiased Odds Ratio (9A.1-8)"="OR",
-             "Variance Odds Ratio (9A.1-11)"="VarOR",
-             "Standard Error Odds Ratio (9A.1-12)"="Std.Err_OR",
-             "Safety Effectiveness (9A.1-10)"="SE",
-             "Standard Error of Safety Effectiveness (9A.1-13)"="Std.Err.SE",
-             "Test Statistic (Step 14)"="test_statistic",
-             "Significance Level (Step 14)"="Significance")
-  }
+      "Current Base Condition"="Base_Current",
+      "Years in the Before Period"="Yrs_Before",
+      "Calibration Factor"="C",
+      "Crash Modification Factor"="CMF",
+
+      "Average Major AADT in the Before Period"="Avg_AADTmaj_b",
+      "Average Minor AADT in the Before Period"="Avg_AADTmin_b",
+      "Predicted Crashes in the Before Period"="P_b",
+      "Observed Crashes in the Before Periods"="O_b",
+      "Overdisperion Factor"="k",
+      "Weight (9A.1-2)"="w",
+      "Expected Crashes in the Before Period (9A.1-2)"="Nexp_b",
+      "Average Major AADT in the After Period"="Avg_AADTmaj_a",
+      "Average Minor AADT in the After Period"="Avg_AADTmin_a",
+      "Predicted Crashes in the After Period"="P_a",
+      "Years in the After Period"="Yrs_After",
+      "Adjustment Factor (9A.1-3)"="adj",
+      "Expected Crashes in the After Period (9A.1-4)"="Nexp_a",
+      "Observed Crashes in the After Period"="O_a",
+      "Odds Ratio (9A.1-5)"="ORi",
+      "Variance (9A.1-11)"="Var.",
+      "Unbiased Odds Ratio (9A.1-8)"="OR",
+      "Variance Odds Ratio"="VarOR",
+      "Standard Error Odds Ratio (9A.1-12)"="Std.Err_OR",
+      "Safety Effectiveness (9A.1-10)"="SE",
+      "Standard Error of Safety Effectiveness (9A.1-13)"="Std.Err.SE",
+      "Test Statistic (Step 14)"="test_statistic",
+      "Significance Level (Step 14)"="Significance")
+
 
 }
+
+else if(group==FALSE & segment==TRUE ){
+
+  Nexpected_b = function(P_b,O_b,w) (P_b*w+(1-w)*O_b) #(9A.1-1)
+
+  Nexpected_a = function(Nexpected_b,adj) (Nexpected_b*adj) #(9A.1-4)
+
+  OR.i = function(O_a,Nexp_a) (O_a)/(Nexp_a) #(9A.1-5) # Lines 72-82 Edit: Removed sum function from denominator and numerator 1/24
+
+  VAR.=function(adj,Nexp_b,w) (adj^(2)*Nexp_b*(1-w)) #(9A.1-9)
+
+  OR.=function(OR.i,VAR.,Nexp_a) (OR.i)/(1+VAR.)/Nexp_a^2 #(9A.1-8)
+
+  SE.=function(OR.) (100*(1-OR.)) # (9A.1-10)
+
+  VarOR.=function(OR.i,O_a,VAR.,Nexp_a) (OR.i)^(2)*(1/(O_a)+(VAR.)/(Nexp_a)^(2)/(1+(VAR.)/(Nexp_a)^2)) #(9A.1-11)
+
+  Std.Err.OR.=function(VarOR.) ((VarOR.)^(1/2)) #(9A.1-12)
+
+  Std.Err.SE.=function(Std.Err.OR.) (100*Std.Err.OR.) #(9A.1-13)
+
+  test_statistic.=function(SE.,Std.Err.SE.)  (abs(SE./Std.Err.SE.)) #Step 14 (a)
+
+  Significance.test=function(test_statistic) ifelse(test_statistic <1.7, "N.S.",
+                                                    ifelse(test_statistic < 2 & test_statistic >= 1.7 ,"90%",
+                                                           ifelse(test_statistic < Inf & test_statistic>= 2.0, "95%",
+                                                                  ifelse(test_statistic==Inf,"Inf",""))))
+  #add if statement for segment=TRUE. This will remove the requirement for ambiguities between intersection and segment treatment types (i.e. minor volume and segment lengths).
+data |>
+    dplyr::select(starts_with(c("Site_No.","Yrs","Base","L","C","CMF","Before","After"))) |>
+    pivot_longer(cols = -c(Site_No.:C,CMF,Yrs_Before,Yrs_After), names_to = c(".value", "Year"), names_sep = "_", values_drop_na = TRUE) |>
+    fill(L, .direction = "downup") |> # suggested edit 1
+    drop_na(Year)|> rowwise() |>
+    dplyr::mutate(
+      P.T.B= if(segment==TRUE) {C*CMF*spf(AADTMAJ=Before.AADT.Major,AADTMIN=NULL,L=L,Base_Condition=Base_Past,Provide_Overdispersion_Factor=FALSE,Segment=TRUE)} else
+      {C*CMF*spf(AADTMAJ=Before.AADT.Major,AADTMIN=Before.AADT.Minor,L=NULL,Base_Condition=Base_Past,Provide_Overdispersion_Factor=FALSE,Segment=FALSE)},
+      P.T.A= if(segment==TRUE) {
+        C*CMF*spf(AADTMAJ=After.AADT.Major,AADTMIN=NULL,L=L,Base_Condition=Base_Past,Provide_Overdispersion_Factor=FALSE,Segment=TRUE)} else
+        {C*CMF*spf(AADTMAJ=After.AADT.Major,AADTMIN=After.AADT.Minor,L=NULL,Base_Condition=Base_Past,Provide_Overdispersion_Factor=FALSE,Segment=FALSE)})|>
+    pivot_wider(
+      names_from = Year,
+      names_sep = "_",
+      values_from = c(Before.AADT.Major,After.AADT.Major,Before.Yr,After.Yr, P.T.B,P.T.A ))%>% rowwise() |> dplyr::mutate( # Begin Table Layout and Empirical Bayes Testing Procedure
+
+        O_b=ifelse(
+          Yrs_Before == 1, rowSums(across(Before.Yr_1)),
+          ifelse(
+            Yrs_Before == 2, rowSums(across(Before.Yr_1:Before.Yr_2)),
+            ifelse(
+              Yrs_Before == 3, rowSums(across(Before.Yr_1:Before.Yr_3)),
+              ifelse(
+                Yrs_Before == 4, rowSums(across(Before.Yr_1:Before.Yr_4)),
+                ifelse(
+                  Yrs_Before == 5, rowSums(across(Before.Yr_1:Before.Yr_5)),
+                  ifelse(
+                    Yrs_Before == 6, rowSums(across(Before.Yr_1:Before.Yr_6)),
+                    ifelse(
+                      Yrs_Before == 7, rowSums(across(Before.Yr_1:Before.Yr_7)),
+                      ifelse(
+                        Yrs_Before == 8, rowSums(across(Before.Yr_1:Before.Yr_8)),
+                        ifelse(
+                          Yrs_Before == 9 ~ rowSums(across(Before.Yr_1:Before.Yr_9)),
+                          ifelse(
+                            Yrs_Before == 10 ~ rowSums(across(Before.Yr_1:Before.Yr_10),""))))))))))),
+
+        Avg_AADTmaj_b=ifelse(
+          Yrs_Before == 1, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_1)),
+          ifelse(
+            Yrs_Before == 2, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_2)),
+            ifelse(
+              Yrs_Before == 3, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_3)),
+              ifelse(
+                Yrs_Before == 4, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_4)),
+                ifelse(
+                  Yrs_Before == 5, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_5)),
+                  ifelse(
+                    Yrs_Before == 6, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_6)),
+                    ifelse(
+                      Yrs_Before == 7, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_7)),
+                      ifelse(
+                        Yrs_Before == 8, rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_8)),
+                        ifelse(
+                          Yrs_Before == 9 ~ rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_9)),
+                          ifelse(
+                            Yrs_Before == 10 ~ rowMeans(across(Before.AADT.Major_1:Before.AADT.Major_10),""))))))))))),
+
+
+        P_b=ifelse(
+          Yrs_Before == 1, rowSums(across(P.T.B_1:P.T.B_1)),
+          ifelse(
+            Yrs_Before == 2, rowSums(across(P.T.B_1:P.T.B_2)),
+            ifelse(
+              Yrs_Before == 3, rowSums(across(P.T.B_1:P.T.B_3)),
+              ifelse(
+                Yrs_Before == 4, rowSums(across(P.T.B_1:P.T.B_4)),
+                ifelse(
+                  Yrs_Before == 5, rowSums(across(P.T.B_1:P.T.B_5)),
+                  ifelse(
+                    Yrs_Before == 6, rowSums(across(P.T.B_1:P.T.B_6)),
+                    ifelse(
+                      Yrs_Before == 7, rowSums(across(P.T.B_1:P.T.B_7)),
+                      ifelse(
+                        Yrs_Before == 8, rowSums(across(P.T.B_1:P.T.B_8)),
+                        ifelse(
+                          Yrs_Before == 9 ~ rowSums(across(P.T.B_1:P.T.B_9)),
+                          ifelse(
+                            Yrs_Before == 10 ~ rowSums(across(P.T.B_1:P.T.B_10),""))))))))))),
+
+
+        Avg_AADTmaj_a=ifelse(
+          Yrs_After == 1, rowMeans(across(After.AADT.Major_1:After.AADT.Major_1)),
+          ifelse(
+            Yrs_After == 2, rowMeans(across(After.AADT.Major_1:After.AADT.Major_2)),
+            ifelse(
+              Yrs_After == 3, rowMeans(across(After.AADT.Major_1:After.AADT.Major_3)),
+              ifelse(
+                Yrs_After == 4, rowMeans(across(After.AADT.Major_1:After.AADT.Major_4)),
+                ifelse(
+                  Yrs_After == 5, rowMeans(across(After.AADT.Major_1:After.AADT.Major_5)),
+                  ifelse(
+                    Yrs_After == 6, rowMeans(across(After.AADT.Major_1:After.AADT.Major_6)),
+                    ifelse(
+                      Yrs_After == 7, rowMeans(across(After.AADT.Major_1:After.AADT.Major_7)),
+                      ifelse(
+                        Yrs_After == 8, rowMeans(across(After.AADT.Major_1:After.AADT.Major_8)),
+                        ifelse(
+                          Yrs_After == 9 ~ rowMeans(across(After.AADT.Major_1:After.AADT.Major_9)),
+                          ifelse(
+                            Yrs_After == 10 ~ rowMeans(across(After.AADT.Major_1:After.AADT.Major_10)),"")))))))))),
+
+        P_a=ifelse(
+          Yrs_After == 1, rowSums(across(P.T.A_1:P.T.A_1)),
+          ifelse(
+            Yrs_After == 2, rowSums(across(P.T.A_1:P.T.A_2)),
+            ifelse(
+              Yrs_After == 3, rowSums(across(P.T.A_1:P.T.A_3)),
+              ifelse(
+                Yrs_After == 4, rowSums(across(P.T.A_1:P.T.A_4)),
+                ifelse(
+                  Yrs_After == 5, rowSums(across(P.T.A_1:P.T.A_5)),
+                  ifelse(
+                    Yrs_After == 6, rowSums(across(P.T.A_1:P.T.A_6)),
+                    ifelse(
+                      Yrs_After == 7, rowSums(across(P.T.A_1:P.T.A_7)),
+                      ifelse(
+                        Yrs_After == 8, rowSums(across(P.T.A_1:P.T.A_8)),
+                        ifelse(
+                          Yrs_After == 9 ~ rowSums(across(P.T.A_1:P.T.A_9)),
+                          ifelse(
+                            Yrs_After == 10 ~ rowSums(across(P.T.A_1:P.T.A_10),""))))))))))),
+
+        k=if(segment==TRUE) {
+          spf(L=L,Base_Condition=Base_Past,Provide_Overdispersion_Factor=TRUE,Segment=TRUE)} else
+          {
+            spf(AADTMAJ=NULL,AADTMIN=NULL,L=NULL,Base_Condition=Base_Past,Provide_Overdispersion_Factor=TRUE,Segment=FALSE)},
+
+        w=(1/(1+k*P_b)), # (9A.1-2)
+
+        adj=(P_a/P_b),  # (9A.1-3)
+
+        Nexp_b= Nexpected_b(P_b,O_b,w), # Nexp,b=Predicted*w+(1-w)O_bs,b; HSM (9A.1-4) #bayes estimates
+
+        Nexp_a=Nexpected_a(Nexp_b,adj), # (9A.1-4)
+
+        O_a=ifelse(
+          Yrs_After == 1, rowSums(across(After.Yr_1)),
+          ifelse(
+            Yrs_After == 2, rowSums(across(After.Yr_1:After.Yr_2)),
+            ifelse(
+              Yrs_After == 3, rowSums(across(After.Yr_1:After.Yr_3)),
+              ifelse(
+                Yrs_After == 4, rowSums(across(After.Yr_1:After.Yr_4)),
+                ifelse(
+                  Yrs_After == 5, rowSums(across(After.Yr_1:After.Yr_5)),
+                  ifelse(
+                    Yrs_After == 6, rowSums(across(After.Yr_1:After.Yr_6)),
+                    ifelse(
+                      Yrs_After == 7, rowSums(across(After.Yr_1:After.Yr_7)),
+                      ifelse(
+                        Yrs_After == 8, rowSums(across(After.Yr_1:After.Yr_8)),
+                        ifelse(
+                          Yrs_After == 9 ~ rowSums(across(After.Yr_1:After.Yr_9)),
+                          ifelse(
+                            Yrs_After == 10 ~ rowSums(across(After.Yr_1:After.Yr_10),""))))))))))),
+
+        ORi= OR.i(O_a,Nexp_a),#Observed,a/Expected,a; HSM (9A.1-5)
+
+        Var.=VAR.(adj,Nexp_b,w),#(9A.1-9)
+
+        OR=OR.(ORi,Var.,Nexp_a), #(9A.1-8)
+
+        SE=SE.(ORi), #correction from OR to ORi
+
+        VarOR=VarOR.(ORi,O_a,Var.,Nexp_a),#9A.1-11
+
+        Std.Err_OR=Std.Err.OR.(VarOR),#9A.1-12
+
+        Std.Err.SE=(Std.Err_OR*100),#9A.1-13
+
+        test_statistic=abs(SE/Std.Err.SE), #Step 14 (a) & (b)
+        Significance=Significance.test(test_statistic)) %>% dplyr::select(Site_No.:C,CMF,O_b:Significance)|> mutate_if(is.numeric, round, 3) -> data
+
+
+    data %>%  rename(
+      "Past Base Condition"="Base_Past",
+      "Current Base Condition"="Base_Current",
+      "Years in the Before Period"="Yrs_Before",
+      "Calibration Factor"="C",
+      "Crash Modification Factor"="CMF",
+      "Segment Length"="L",
+      "Average AADT in the Before Period"="Avg_AADTmaj_b",
+
+      "Predicted Crashes in the Before Period"="P_b",
+      "Observed Crashes in the Before Periods"="O_b",
+      "Overdisperion Factor"="k",
+      "Weight (9A.1-2)"="w",
+      "Expected Crashes in the Before Period (9A.1-2)"="Nexp_b",
+      "Average AADT in the After Period"="Avg_AADTmaj_a",
+
+      "Predicted Crashes in the After Period"="P_a",
+      "Years in the After Period"="Yrs_After",
+      "Adjustment Factor (9A.1-3)"="adj",
+      "Expected Crashes in the After Period (9A.1-4)"="Nexp_a",
+      "Observed Crashes in the After Period"="O_a",
+      "Odds Ratio (9A.1-5)"="ORi",
+      "Variance (9A.1-11)"="Var.",
+      "Unbiased Odds Ratio (9A.1-8)"="OR",
+      "Variance Odds Ratio"="VarOR",
+      "Standard Error Odds Ratio (9A.1-12)"="Std.Err_OR",
+      "Safety Effectiveness (9A.1-10)"="SE",
+      "Standard Error of Safety Effectiveness (9A.1-13)"="Std.Err.SE",
+      "Test Statistic (Step 14)"="test_statistic",
+      "Significance Level (Step 14)"="Significance")
+}
+
+
+
+}
+
+
+
+
 
 #' spf
 #'

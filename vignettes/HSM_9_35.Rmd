@@ -16,7 +16,7 @@ knitr::opts_chunk$set(
 )
 ```
 
-2010 HSM Section 9-35 Site Specific Empirical Bayes Analysis is included in the Highway Safety Manual (HSM) package. The vignette provides instructions to use the section 9-35 and spf functions.
+The 2010 Highway Safety Manual (HSM) Section 9-35 Site Specific Empirical Bayes (EB) Analysis is included in version 1.0 of HSM package. The vignette provides instructions to use the section 9-35 "HSM_9_35" and "spf" functions.
 
 ```{r setup}
 #install.packages("devtools")	
@@ -27,12 +27,86 @@ Install package via GitHub.
 ```{r}
 #install_github("https://github.com/cn838/HSM.git")
 library(HSM)
+```
+
+# The spf function
+Predicted crashes can be computed using the spf function. 
+```{r}
+spf(
+  AADTMAJ=1000,
+  AADTMIN=100,
+  L=NULL,
+  Base_Condition="HSM-RUR2-4ST-KABCO",
+  Provide_Overdispersion_Factor=FALSE,
+  Segment=FALSE
+)
+```
+
+The overdispersion parameter (k) is provided by specifying TRUE within the provide overdispersion factor parameter.  Please note that version 1.0 only includes intersection SPFs from the 2010 HSM found in the SPF_table.RData. 
+```{r}
+spf(
+  AADTMAJ=1000,
+  AADTMIN=100,
+  L=NULL,
+  Base_Condition="HSM-RUR2-4ST-KABCO",
+  Provide_Overdispersion_Factor=TRUE,
+  Segment=FALSE
+)
+```
+# The HSM Section 9-35 function
+
+The HSM_9_35 function is demonstrated within two examples.  The two examples demonstrate the accuracy and the use of the function with HSM example and user defined data, respectively. 
+
+## A sample problem to illustrate the HSM_9_35 function with the EB Before/After Safety Effectiveness Evaluation Method
+
+Excel friendly users may import data into Rstudio. It is recommended to use the X9_10_template with version 1.0. Take for example, section 9.10  saved as "X9_10_seg.RData" (pg. 9-17). The script supports a total of 20 years of data (e.g. 10 years before and after).
+
+```{r}
+str(X9_10_seg) 
+```
+
+Check the "Basic Input Data" using the "testthat" package.
+```{r}
+library(testthat)
+
+testthat::test_that("Basic Input Data check", {
+  expect_equal(sum(HSM::HSM_9_35(data = X9_10_seg, segment=TRUE, group = FALSE, group_base_by = "Past")[[9]]), 122)
+  expect_equal(sum(HSM::HSM_9_35(data = X9_10_seg, segment=TRUE, group = FALSE, group_base_by = "Past")[["Observed Crashes in the After Period"]]), 30)
+  print("Basic input data matches.")
+})
 
 ```
 
-Enter Data. This is performed by using concatenate c() and data.frame().  Please note that column titles must be the same titles.
+The site specific results are obtained and cross verified with the HSM.
 ```{r}
+testthat::test_that("values from Eq. 9A.1-11", {
+  expect_equal(sum(HSM::HSM_9_35(data = X9_10_seg, segment=TRUE, group = FALSE, group_base_by = "Past" )[["Variance (9A.1-11)"]]), 11.161 )
+  print("The cumulative sum of the Variance terms match the expected output")
+})
 
+```
+
+Similarly, the "Estimation of the Precision of the Treatment Effectiveness" are verified.
+```{r}
+testthat::test_that("Precision tests", {expect_equal(HSM::HSM_9_35(data = X9_10_seg, segment=TRUE, group = TRUE, group_base_by = "Past")[["Standard Error of Safety Effectiveness (9A.1-13)"]], 13.882)
+  expect_equal(HSM::HSM_9_35(data = X9_10_seg, segment=TRUE, group = TRUE, group_base_by = "Past")[["Test Statistic (Step 14)"]], 2.194)
+  print("The percision outputs match the results from Steps 13 & 14")
+  })
+```
+
+The site specific results table is now ready to be copied and pasted into a spreadsheet, for word processing. 
+```{r}
+HSM::HSM_9_35(data = X9_10_seg, segment=TRUE, group = FALSE, group_base_by = "Past") %>% knitr::kable(digits = 3, format.args = list(decimal.mark = ".", big.mark = ","), align= 'c', caption = "Example 9.10 Emperical Bayes Total Crash Pooled Results ")
+```
+
+Lastly, the effectiveness of the treatment effect or CMF is obtained, for word processing.
+```{r}
+HSM::HSM_9_35(data = X9_10_seg, segment=TRUE, group = TRUE, group_base_by = "Past") %>% knitr::kable(digits = 3, format.args = list(decimal.mark = ".", big.mark = ","), align= 'c', caption = "Example 9.10 Emperical Bayes Total Crash Pooled Results ")
+```
+
+## HSM_9_35 for Intersections
+Entering data is performed by implementing base R functions (i.e. concatenate c() and data.frame()).  Please note that version 1.0 requires the column names to be exactly the same as contained in the "X9_10_template.RData". 
+```{r}
 data=data.frame(
 Site_No.=c(1,2,3,4,5,6), # id number 
 Yrs_Before=c(3,3,3,3,3,3), # years in the before period
@@ -46,15 +120,16 @@ Base_Past=c(
   "HSM-RUR2-4SG-KABCO"
 ),
 Base_Current=c(
-  "Roundabout",
-  "Roundabout",
-  "Roundabout",
-  "Roundabout",
-  "Roundabout",
-  "Roundabout"),
-L=c(NA,NA,NA,NA,NA,NA), # not required for intersection analysis
+  "RUR2-4RA",
+  "RUR2-4RA",
+  "RUR2-4RA",
+  "Urban Single Lane Roundabout",
+  "RUR2-4RA",
+  "RUR2-4RA"),
+L=c(NA,NA,NA,NA,NA,NA), # omit for intersection analysis
 CMF=c(1.1,0.90,0.98,1,1,1.0), #crash modification factor. User specifies 1.0 if none was used.
 C=c(1.2,1.2,1.2,1.2,1.2,1.2), #calibration factor. User specifies 1.0 if none was used.
+
 Before.AADT.Major_1=c(1100,1190,1100,1150,900,500), #traffic volumes on the major approach during year one for site one ect.
 Before.AADT.Major_2=c(1000,900,1150,1150,900,550),
 Before.AADT.Major_3=c(1000,950,1125,1150,900,550),
@@ -83,61 +158,36 @@ After.AADT.Minor_4=c(200,200,80,700,80,90),
 After.AADT.Minor_5=c(200,200,80,700,80,90),
 After.AADT.Minor_6=c(200,200,80,700,80,90),
 
-Before.Yr_1=c(0,2,3,1,1,3), # crashes in the before period
+Before.Yr_1=c(0,2,3,1,1,3), # crashes in the before periods 1,2,3,..,6
 Before.Yr_2=c(0,0,0,0,0,0),
 Before.Yr_3=c(1,0,1,3,0,0),
 Before.Yr_4=c(0,1,0,1,0,1),
 Before.Yr_5=c(1,0,0,1,0,1),
 Before.Yr_6=c(0,0,0,1,1,0),
 
-After.Yr_1=c(0,0,0,0,0,1), # crashes in the after period
+After.Yr_1=c(0,0,0,0,0,1), # crashes in the after periods 1,2,3,..,6
 After.Yr_2=c(0,0,0,0,0,0),
 After.Yr_3=c(0,0,1,0,0,1),
 After.Yr_4=c(0,1,0,0,0,0),
 After.Yr_5=c(0,0,0,0,0,0),
 After.Yr_6=c(1,0,0,1,0,0))
-
 ```
-
-Specify the group equal to "FALSE" to provide summary table for site specific results. 
+Specify the "group" parameter equal to "FALSE" to provide a  tibble that contains the site specific results. 
 ```{r}
 HSM::HSM_9_35(data = data, segment=FALSE, group = FALSE)
 ```
-
-Specify the group equal to "TRUE" to provide summary table for pooled results. The unbiased Odds Ratio provides the CMF. Similar to the comparison group method, this approach is vulnerable to having zero in the after periods.
+Specify the "group" and "group_base_by" parameters equal to "TRUE", "Past" or "Current" to provide a tibble that contains the "Estimation of the Precision of the Treatment Effectiveness". The unbiased Odds Ratio is the Crash Modification Factor (CMF). Similar to the Comparison Group (CG) method, sites with zero crashes in the after periods will effect the precision of the estimate.  
 ```{r}
-HSM::HSM_9_35(data = data, segment=FALSE, group = TRUE)
+HSM::HSM_9_35(data = data, segment=FALSE, group = TRUE, group_base_by= "Past")
 ```
 
-By using kable() the user can copy and paste table contents into spreadsheet.
-
+Specify the "group_base_by" parameter to obtain results aggregated by future or current base conditions.   
 ```{r}
-
-HSM::HSM_9_35(data = data, segment=FALSE, group = FALSE) %>% knitr::kable(digits = 3, format.args = list(decimal.mark = ".", big.mark = ","), align= 'c', caption = "Emperical Bayes Total Crash Pooled Results ")
+HSM::HSM_9_35(data = data, segment=FALSE, group = TRUE, group_base_by = "Current") 
 ```
 
-
-predicted crashes can be computed using the spf function.
+The results are copied and pasted into an spreadsheet, for word processing using "kable()".
 ```{r}
-spf(
-  AADTMAJ=1000,
-  AADTMIN=100,
-  L=NULL,
-  Base_Condition="HSM-RUR2-4ST-KABCO",
-  Provide_Overdispersion_Factor=FALSE,
-  Segment=FALSE
-)
+HSM::HSM_9_35(data = data, segment=FALSE, group = TRUE, group_base_by = "Current" ) %>% knitr::kable(digits = 3, format.args = list(decimal.mark = ".", big.mark = ","), align= 'c', caption = "Table 1: Estimation of the Precision of the Treatment Effectiveness")
 ```
-
-The overdispersion parameter (k) is provided by specifying TRUE within the provide overdispersion factor parameter.
-```{r}
-spf(
-  AADTMAJ=1000,
-  AADTMIN=100,
-  L=NULL,
-  Base_Condition="HSM-RUR2-4ST-KABCO",
-  Provide_Overdispersion_Factor=TRUE,
-  Segment=FALSE
-)
-```
-
+Please note more flexibility will be provided with future revisions.
